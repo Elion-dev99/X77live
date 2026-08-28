@@ -10,7 +10,9 @@ import {
   normalizeSessionKey,
   resolveReportDownload,
   loadReportDocument,
+  buildInterimReportFiles,
 } from "./daily-report-files.js";
+import { getCurrentBusinessDayStats } from "./daily-stats.js";
 import {
   buildStatusEmbed,
   buildNotificationEmbed,
@@ -18,6 +20,7 @@ import {
   buildSettingsEmbed,
   buildHistoryEmbed,
   buildReportListEmbed,
+  buildDailySummaryEmbed,
 } from "./format.js";
 import {
   sendPeriodicNotification,
@@ -404,6 +407,56 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
+    case "report_interim": {
+      await interaction.deferReply({ ephemeral: true });
+      await runScrape(getConfig, persistConfig, clientRef);
+
+      const now = new Date();
+      const current = getCurrentBusinessDayStats(getConfig(), now);
+      if (!current.ok) {
+        return {
+          type: "deferred",
+          interaction,
+          content:
+            "⚠️ 現在は営業時間外です（営業 **13:00 〜 翌 01:00**）。\n確定レポートは `/レポート取得` で取得できます。",
+          ephemeral: true,
+        };
+      }
+
+      const configNow = getConfig();
+      const { stats } = current;
+      const embed = buildDailySummaryEmbed(configNow, stats, {
+        interim: true,
+        asOf: now,
+      });
+
+      const format = parsed.format || "view";
+      if (format === "view") {
+        return {
+          type: "deferred",
+          interaction,
+          embed,
+          ephemeral: true,
+        };
+      }
+
+      const interim = buildInterimReportFiles(
+        configNow,
+        stats,
+        format === "view" ? "both" : format,
+        now
+      );
+
+      return {
+        type: "deferred",
+        interaction,
+        content: `📊 営業日 **${stats.sessionKey}** の途中経過レポート（暫定）`,
+        embed,
+        files: interim.files,
+        ephemeral: true,
+      };
+    }
+
     case "help":
       return {
         type: "text",
@@ -419,7 +472,8 @@ export async function handleCommand(interaction, parsed) {
           "• `/設定` `/設定確認` `/通知テスト`",
           "• `/監視除外` `/監視再開` `/パスワード変更`",
           "• `/再起動` — Bot サーバー再起動",
-          "• `/レポート一覧` `/レポート取得` — 営業日レポート",
+          "• `/レポート一覧` `/レポート取得` — 確定レポート",
+          "• `/レポート途中` — 営業日の現時点までの暫定レポート",
           "• `/ログアウト` — セッション終了",
           "",
           "未ログイン時は各コマンドの `パスワード` オプションでも実行できます。",

@@ -60,6 +60,28 @@ export function tickDailyStats(config, statuses, now = new Date()) {
   current.lastTickAt = now.toISOString();
 }
 
+/**
+ * @returns {{ ok: true, stats: { sessionKey: string, boys: object } } | { ok: false, reason: string }}
+ */
+export function getCurrentBusinessDayStats(config, now = new Date()) {
+  const settings = config.settings || {};
+  const sessionKey = getBusinessSessionKey(now, settings);
+  if (!sessionKey) {
+    return { ok: false, reason: "closed" };
+  }
+
+  const stored = config.dailyOnlineStats;
+  const boys =
+    stored?.sessionKey === sessionKey && stored?.boys
+      ? JSON.parse(JSON.stringify(stored.boys))
+      : {};
+
+  return {
+    ok: true,
+    stats: { sessionKey, boys },
+  };
+}
+
 let summaryHandle = null;
 
 export function startDailySummaryScheduler(client, getConfig, persistConfig) {

@@ -9,10 +9,10 @@ import {
   formatDurationMinutes,
   formatSessionPeriod,
 } from "../src/business-hours.js";
-import { tickDailyStats } from "../src/daily-stats.js";
+import { tickDailyStats, getCurrentBusinessDayStats } from "../src/daily-stats.js";
 import { defaultConfig } from "../src/store.js";
 import { STATUS } from "../src/scraper.js";
-import { saveDailyReportFiles, buildDailyReportDocument, listDailyReportFiles, resolveReportDownload } from "../src/daily-report-files.js";
+import { saveDailyReportFiles, buildDailyReportDocument, listDailyReportFiles, resolveReportDownload, buildInterimReportFiles } from "../src/daily-report-files.js";
 import { buildNewBoyMessage, buildDailySummaryEmbed, buildReportListEmbed } from "../src/format.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -96,6 +96,25 @@ describe("daily-stats", () => {
     assert.equal(config.dailyOnlineStats.sessionKey, "2026-08-28");
     assert.equal(config.dailyOnlineStats.boys["1"].onlineMinutes, 2);
     assert.equal(config.dailyOnlineStats.boys["2"], undefined);
+  });
+
+  it("getCurrentBusinessDayStats returns in-progress session", () => {
+    const config = defaultConfig();
+    config.dailyOnlineStats = {
+      sessionKey: "2026-08-28",
+      boys: { "1": { name: "太郎", onlineMinutes: 30 } },
+      lastTickAt: new Date().toISOString(),
+    };
+    config.settings.businessHoursOpen = "13:00";
+    config.settings.businessHoursClose = "01:00";
+
+    const result = getCurrentBusinessDayStats(config, jstDate(2026, 8, 28, 20, 0));
+    assert.equal(result.ok, true);
+    assert.equal(result.stats.sessionKey, "2026-08-28");
+    assert.equal(result.stats.boys["1"].onlineMinutes, 30);
+
+    const closed = getCurrentBusinessDayStats(config, jstDate(2026, 8, 28, 10, 0));
+    assert.equal(closed.ok, false);
   });
 });
 
@@ -215,5 +234,30 @@ describe("daily-report-files", () => {
     const text = JSON.stringify(embed.data);
     assert.match(text, /2026-08-28/);
     assert.match(text, /レポート取得/);
+  });
+
+  it("buildInterimReportFiles marks report as interim", () => {
+    const config = defaultConfig();
+    const { report, files } = buildInterimReportFiles(
+      config,
+      { sessionKey: "2026-08-28", boys: { "1": { name: "A", onlineMinutes: 10 } } },
+      "both",
+      jstDate(2026, 8, 28, 20, 0)
+    );
+    assert.equal(report.interim, true);
+    assert.equal(files.length, 2);
+    assert.match(files[0].name, /interim\.json$/);
+  });
+
+  it("buildDailySummaryEmbed interim mode shows as-of time", () => {
+    const config = defaultConfig();
+    const embed = buildDailySummaryEmbed(
+      config,
+      { sessionKey: "2026-08-28", boys: { "1": { name: "A", onlineMinutes: 10 } } },
+      { interim: true, asOf: jstDate(2026, 8, 28, 20, 0) }
+    );
+    const text = JSON.stringify(embed.data);
+    assert.match(text, /暫定/);
+    assert.match(text, /集計時点/);
   });
 });
