@@ -105,7 +105,16 @@ export function loadConfig() {
         : defaults.adminRoleIds,
     };
     ensureAuthConfig(config);
+    const hadHash = Boolean(config.auth.passwordHash);
     initPasswordFromEnv(config);
+    const forceReset =
+      process.env.ADMIN_PASSWORD_RESET === "true" ||
+      process.env.ADMIN_PASSWORD_RESET === "1";
+    if (forceReset && process.env.ADMIN_PASSWORD?.trim()) {
+      saveConfig(config);
+    } else if (!hadHash && config.auth.passwordHash) {
+      saveConfig(config);
+    }
     return config;
   } catch (err) {
     console.error("[store] config load error:", err.message);

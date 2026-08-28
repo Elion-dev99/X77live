@@ -80,6 +80,30 @@ describe("auth", () => {
     }
   });
 
+  it("initPasswordFromEnv force reset with ADMIN_PASSWORD_RESET", () => {
+    const origPassword = process.env.ADMIN_PASSWORD;
+    const origReset = process.env.ADMIN_PASSWORD_RESET;
+    process.env.ADMIN_PASSWORD = "0000";
+    process.env.ADMIN_PASSWORD_RESET = "true";
+    try {
+      const config = defaultConfig();
+      const old = createPasswordRecord("old-password");
+      config.auth.passwordSalt = old.passwordSalt;
+      config.auth.passwordHash = old.passwordHash;
+      config.auth.sessions = { u1: new Date(Date.now() + 3600000).toISOString() };
+
+      initPasswordFromEnv(config);
+      assert.equal(verifyPassword("0000", config), true);
+      assert.equal(verifyPassword("old-password", config), false);
+      assert.deepEqual(config.auth.sessions, {});
+    } finally {
+      if (origPassword === undefined) delete process.env.ADMIN_PASSWORD;
+      else process.env.ADMIN_PASSWORD = origPassword;
+      if (origReset === undefined) delete process.env.ADMIN_PASSWORD_RESET;
+      else process.env.ADMIN_PASSWORD_RESET = origReset;
+    }
+  });
+
   it("ADMIN_COMMANDS includes refresh and history", () => {
     assert.ok(ADMIN_COMMANDS.has("refresh"));
     assert.ok(ADMIN_COMMANDS.has("history"));
