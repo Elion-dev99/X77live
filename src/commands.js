@@ -372,6 +372,8 @@ export async function handleCommand(interaction, parsed) {
           "### 自動監視",
           `- **${config.pollIntervalMinutes || 2}分** ごとに x77.jp をチェック`,
           `- **${config.notifyIntervalMinutes}分** ごとに Discord へ定期通知`,
+          `- **新規ボーイ** がロスターに追加されると通知`,
+          `- **毎日 01:00** に本日のオンライン稼働サマリーを投稿（営業 13:00〜翌01:00）`,
         ].join("\n"),
       };
 

@@ -1,7 +1,8 @@
 import { scrapeOsakaStatuses, STATUS } from "./scraper.js";
 import { addHistory, saveConfig } from "./store.js";
-import { sendStatusChangeNotification } from "./notifier.js";
+import { sendStatusChangeNotification, sendNewBoyNotification } from "./notifier.js";
 import { buildBoyStatusChangeMessage, isOnlineStatus } from "./format.js";
+import { tickDailyStats } from "./daily-stats.js";
 
 /** @type {ReturnType<typeof setInterval>|null} */
 let pollHandle = null;
@@ -37,6 +38,24 @@ function detectChanges(config, statuses) {
   }
 
   return changes;
+}
+
+/**
+ * @param {object} config
+ * @param {Map<string, { name: string }>} roster
+ */
+function detectNewBoys(config, roster) {
+  const hadRoster = Object.keys(config.boys || {}).length > 0;
+  if (!hadRoster || !config.lastScrapeAt) return [];
+
+  /** @type {Array<{ boyId: string, name: string }>} */
+  const newBoys = [];
+  for (const [boyId, info] of roster) {
+    if (!config.boys[boyId]) {
+      newBoys.push({ boyId, name: info.name });
+    }
+  }
+  return newBoys;
 }
 
 /**
@@ -106,9 +125,12 @@ export async function runScrape(getConfig, persistConfig, client = null) {
   );
 
   const data = await scrapeOsakaStatuses(shopId, excludeIds);
+  const newBoys = detectNewBoys(config, data.roster);
   const prevStatuses = { ...(config.boyStatuses || {}) };
   const statuses = applyScrapeResult(config, data);
   const changes = detectChanges({ boyStatuses: prevStatuses }, statuses);
+
+  tickDailyStats(config, statuses);
 
   for (const change of changes) {
     addHistory(config, {
@@ -121,6 +143,18 @@ export async function runScrape(getConfig, persistConfig, client = null) {
   }
 
   persistConfig();
+
+  if (client && newBoys.length > 0 && config.settings.pingOnNewBoy !== false) {
+    for (const boy of newBoys) {
+      addHistory(config, {
+        type: "boy_new",
+        boyId: boy.boyId,
+        name: boy.name,
+      });
+      await sendNewBoyNotification(client, config, boy);
+    }
+    persistConfig();
+  }
 
   if (client && config.settings.pingOnStatusChange && changes.length > 0) {
     for (const change of changes) {
