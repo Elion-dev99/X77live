@@ -67,6 +67,8 @@ describe("scraper", () => {
     const html = fs.readFileSync(FIXTURE_ROSTER, "utf8");
     const roster = parseRosterPage(html);
     assert.ok(roster.size > 10);
+    assert.equal(roster.get("10235")?.name, "つむぎ");
+    assert.equal(roster.get("12115")?.name, "ゆきひろ");
   });
 
   it("mergeOsakaStatuses marks offline boys", () => {
