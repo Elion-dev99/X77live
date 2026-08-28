@@ -61,6 +61,20 @@
   あつき / いくま / ...
 ```
 
+## Monkey Network デプロイ（無料・Bot 最大4体）
+
+1. [Monkey Network](https://monkey-network.xyz/) → [ダッシュボード](https://dash.monkey-network.xyz) で Node.js サーバー作成
+2. SFTP で `/home/container/` にアップロード（`scripts/pack-deploy.sh` で zip 作成可）
+3. Console で `npm install` → 環境変数設定 → `npm start`
+
+詳細: [MONKEY-NETWORK.md](./MONKEY-NETWORK.md) / [monkey-network.env.example](./monkey-network.env.example)
+
+| 項目 | 内容 |
+|------|------|
+| Bot 数 | **最大4** / アカウント |
+| RAM | **2GB** / Bot |
+| 更新 | **14日ごと** にダッシュボードで確認 |
+
 ## Bot-Hosting.net デプロイ（無料）
 
 1. [Bot-Hosting.net](https://bot-hosting.net/) で GitHub リポジトリ `Elion-dev99/X77live` を Import
