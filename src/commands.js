@@ -1,6 +1,6 @@
 import { isAdmin, applySetting } from "./config.js";
 import {
-  getConfig as getStoreConfig,
+  loadConfig as getStoreConfig,
   saveConfig,
   addHistory,
 } from "./store.js";
