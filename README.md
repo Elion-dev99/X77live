@@ -61,6 +61,24 @@
   あつき / いくま / ...
 ```
 
+## Bot-Hosting.net デプロイ（無料）
+
+1. [Bot-Hosting.net](https://bot-hosting.net/) で GitHub リポジトリ `Elion-dev99/X77live` を Import
+2. **Startup** → Entry File: `index.js`
+3. **Env Variables** に設定（詳細は [BOT-HOSTING.md](./BOT-HOSTING.md) / [bot-hosting.env.example](./bot-hosting.env.example)）
+
+| 変数 | 必須 | 説明 |
+|------|------|------|
+| `DISCORD_TOKEN` | ✅ | Bot トークン |
+| `DISCORD_CLIENT_ID` | ✅ | Application ID |
+| `DISCORD_GUILD_ID` | 推奨 | サーバー ID |
+| `NOTIFY_CHANNEL_ID` | 推奨 | 通知先チャンネル |
+| `SHOP_ID` | 任意 | 大阪店 = `4` |
+| `ADMIN_PASSWORD` | ✅ | カスタマイズ用パスワード |
+| `DATA_DIR` | 推奨 | `data` |
+
+4. Start → Console でログイン成功を確認
+
 ## Railway デプロイ
 
 1. [Railway](https://railway.com/) で GitHub リポジトリを Import

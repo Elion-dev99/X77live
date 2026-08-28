@@ -109,7 +109,7 @@ export async function handleCommand(interaction, parsed) {
         return {
           type: "text",
           content:
-            "⚠️ 管理パスワードが未設定です。Railway Variables に `ADMIN_PASSWORD` を設定してください。",
+            "⚠️ 管理パスワードが未設定です。環境変数 `ADMIN_PASSWORD` を設定してください。",
           ephemeral: true,
         };
       }
