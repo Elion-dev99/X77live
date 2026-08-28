@@ -172,25 +172,23 @@ export function parseRosterPage(html) {
   /** @type {Map<string, { boyId: string, name: string }>} */
   const roster = new Map();
 
-  for (const m of html.matchAll(/boy_id=(\d+)/g)) {
-    roster.set(m[1], { boyId: m[1], name: null });
-  }
+  const blocks = html.match(/<li class="flame_size1">[\s\S]*?<\/li>/g) || [];
+  for (const block of blocks) {
+    const idMatch = block.match(/boy_id=(\d+)/);
+    if (!idMatch) continue;
 
-  for (const m of html.matchAll(
-    /boy_id=(\d+)[\s\S]{0,600}?class="boy_name">([^<]+)</g
-  )) {
-    roster.set(m[1], { boyId: m[1], name: m[2].trim() });
-  }
+    const boyId = idMatch[1];
+    let name = null;
 
-  for (const m of html.matchAll(
-    /boy_id=(\d+)[\s\S]{0,400}?alt="([^"]+)"/g
-  )) {
-    const existing = roster.get(m[1]);
-    if (existing && !existing.name) {
-      existing.name = m[2].trim();
-    } else if (!existing) {
-      roster.set(m[1], { boyId: m[1], name: m[2].trim() });
+    const nameMatch = block.match(/class="boy_name">([^<]+)</);
+    if (nameMatch) {
+      name = nameMatch[1].trim();
+    } else {
+      const altMatch = block.match(/class="boy_img"[^>]*alt="([^"]+)"/);
+      if (altMatch) name = altMatch[1].trim();
     }
+
+    roster.set(boyId, { boyId, name });
   }
 
   return roster;
@@ -208,8 +206,8 @@ export function mergeOsakaStatuses(roster, online) {
     const live = online.get(boyId);
     result.push({
       boyId,
-      name: boy.name || live?.name || `ID:${boyId}`,
-      liveName: live?.name,
+      name: live?.name || boy.name || `ID:${boyId}`,
+      liveName: live?.name || null,
       status: live ? live.status : STATUS.OFFLINE,
     });
   }
