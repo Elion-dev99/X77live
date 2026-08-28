@@ -5,11 +5,19 @@ import {
   addHistory,
 } from "./store.js";
 import {
+  listDailyReportFiles,
+  getLatestSessionKey,
+  normalizeSessionKey,
+  resolveReportDownload,
+  loadReportDocument,
+} from "./daily-report-files.js";
+import {
   buildStatusEmbed,
   buildNotificationEmbed,
   buildMemberListEmbed,
   buildSettingsEmbed,
   buildHistoryEmbed,
+  buildReportListEmbed,
 } from "./format.js";
 import {
   sendPeriodicNotification,
@@ -350,6 +358,52 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
+    case "report_list": {
+      const reports = listDailyReportFiles().slice(-parsed.limit).reverse();
+      return {
+        type: "embed",
+        embed: buildReportListEmbed(config, reports),
+        ephemeral: true,
+      };
+    }
+
+    case "report_download": {
+      let sessionKey = normalizeSessionKey(parsed.sessionKey);
+      if (!sessionKey && !parsed.sessionKey) {
+        sessionKey = getLatestSessionKey();
+      }
+      if (!sessionKey) {
+        return {
+          type: "text",
+          content:
+            parsed.sessionKey && !normalizeSessionKey(parsed.sessionKey)
+              ? "⚠️ 営業日は `YYYY-MM-DD` 形式で指定してください（例: 2026-08-28）。"
+              : "⚠️ 保存済みのレポートがありません。",
+          ephemeral: true,
+        };
+      }
+
+      const resolved = resolveReportDownload(sessionKey, parsed.format || "both");
+      if (!resolved) {
+        return {
+          type: "text",
+          content: `⚠️ **${sessionKey}** のレポートが見つかりません。\`/レポート一覧\` で確認してください。`,
+          ephemeral: true,
+        };
+      }
+
+      const report = loadReportDocument(resolved.sessionKey);
+      const period = report?.period?.label || sessionKey;
+      const count = report?.onlineCount ?? "—";
+
+      return {
+        type: "files",
+        content: `📁 営業日 **${resolved.sessionKey}**（${period}）\nオンライン稼働: **${count}** 名`,
+        files: resolved.files,
+        ephemeral: true,
+      };
+    }
+
     case "help":
       return {
         type: "text",
@@ -365,6 +419,7 @@ export async function handleCommand(interaction, parsed) {
           "• `/設定` `/設定確認` `/通知テスト`",
           "• `/監視除外` `/監視再開` `/パスワード変更`",
           "• `/再起動` — Bot サーバー再起動",
+          "• `/レポート一覧` `/レポート取得` — 営業日レポート",
           "• `/ログアウト` — セッション終了",
           "",
           "未ログイン時は各コマンドの `パスワード` オプションでも実行できます。",

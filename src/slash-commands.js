@@ -136,6 +136,41 @@ export function buildSlashCommands() {
       .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
+      .setName("レポート一覧")
+      .setDescription("保存済みの営業日レポート一覧を表示")
+      .addIntegerOption((opt) =>
+        opt
+          .setName("件数")
+          .setDescription("表示件数（デフォルト10、最大30）")
+          .setMinValue(1)
+          .setMaxValue(30)
+          .setRequired(false)
+      )
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
+      .setName("レポート取得")
+      .setDescription("営業日レポートファイル（JSON/CSV）をダウンロード")
+      .addStringOption((opt) =>
+        opt
+          .setName("営業日")
+          .setDescription("営業開始日 YYYY-MM-DD（省略時は最新）")
+          .setRequired(false)
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("形式")
+          .setDescription("ファイル形式（デフォルト: 両方）")
+          .setRequired(false)
+          .addChoices(
+            { name: "JSON", value: "json" },
+            { name: "CSV", value: "csv" },
+            { name: "両方", value: "both" }
+          )
+      )
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
       .setName("ヘルプ")
       .setDescription("コマンド一覧と使い方"),
   ].map((cmd) => cmd.toJSON());
@@ -209,6 +244,19 @@ export function parseSlashInteraction(interaction) {
     case "再起動":
       return {
         command: "restart_server",
+        password: getPassword(interaction),
+      };
+    case "レポート一覧":
+      return {
+        command: "report_list",
+        limit: interaction.options.getInteger("件数") || 10,
+        password: getPassword(interaction),
+      };
+    case "レポート取得":
+      return {
+        command: "report_download",
+        sessionKey: interaction.options.getString("営業日"),
+        format: interaction.options.getString("形式") || "both",
         password: getPassword(interaction),
       };
     case "ヘルプ":

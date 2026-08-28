@@ -5,6 +5,7 @@ import {
   Events,
   REST,
   Routes,
+  AttachmentBuilder,
 } from "discord.js";
 import { buildSlashCommands, parseSlashInteraction } from "./slash-commands.js";
 import { initCommands, handleCommand, getConfig, persistConfig } from "./commands.js";
@@ -143,6 +144,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ephemeral: true,
       });
       scheduleProcessRestart(client, result.reason);
+      return;
+    }
+
+    if (result.type === "files") {
+      const attachments = (result.files || []).map(
+        (file) => new AttachmentBuilder(file.path, { name: file.name })
+      );
+      await interaction.reply({
+        allowedMentions: { parse: [] },
+        content: result.content,
+        files: attachments,
+        ephemeral: result.ephemeral !== false,
+      });
       return;
     }
 

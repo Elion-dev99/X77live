@@ -12,8 +12,8 @@ import {
 import { tickDailyStats } from "../src/daily-stats.js";
 import { defaultConfig } from "../src/store.js";
 import { STATUS } from "../src/scraper.js";
-import { buildNewBoyMessage, buildDailySummaryEmbed } from "../src/format.js";
-import { saveDailyReportFiles, buildDailyReportDocument, listDailyReportFiles } from "../src/daily-report-files.js";
+import { saveDailyReportFiles, buildDailyReportDocument, listDailyReportFiles, resolveReportDownload } from "../src/daily-report-files.js";
+import { buildNewBoyMessage, buildDailySummaryEmbed, buildReportListEmbed } from "../src/format.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -162,6 +162,33 @@ describe("daily-report-files", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it("resolveReportDownload rejects invalid session keys", () => {
+    assert.equal(resolveReportDownload("../hack", "json"), null);
+    assert.equal(resolveReportDownload("2026-13-99", "json"), null);
+  });
+
+  it("resolveReportDownload returns existing files", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "x77-dl-"));
+    const reportsDir = path.join(tmpDir, "reports");
+
+    saveDailyReportFiles(
+      defaultConfig(),
+      { sessionKey: "2026-08-28", boys: { "1": { name: "A", onlineMinutes: 10 } } },
+      jstDate(2026, 8, 29, 1, 0),
+      reportsDir
+    );
+
+    const both = resolveReportDownload("2026-08-28", "both", reportsDir);
+    assert.ok(both);
+    assert.equal(both.files.length, 2);
+
+    const csvOnly = resolveReportDownload("2026-08-28", "csv", reportsDir);
+    assert.equal(csvOnly.files.length, 1);
+    assert.match(csvOnly.files[0].name, /\.csv$/);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   it("buildDailyReportDocument sorts by online minutes", () => {
     const config = defaultConfig();
     const report = buildDailyReportDocument(config, {
@@ -173,5 +200,20 @@ describe("daily-report-files", () => {
     });
     assert.equal(report.boys[0].name, "A");
     assert.equal(report.boys[1].name, "B");
+  });
+
+  it("buildReportListEmbed lists saved reports", () => {
+    const config = defaultConfig();
+    const embed = buildReportListEmbed(config, [
+      {
+        sessionKey: "2026-08-28",
+        period: "8/28 13:00 〜 8/29 01:00",
+        onlineCount: 3,
+        totalOnlineMinutes: 200,
+      },
+    ]);
+    const text = JSON.stringify(embed.data);
+    assert.match(text, /2026-08-28/);
+    assert.match(text, /レポート取得/);
   });
 });

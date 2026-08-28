@@ -11,6 +11,8 @@ export const ADMIN_COMMANDS = new Set([
   "refresh",
   "history",
   "restart_server",
+  "report_list",
+  "report_download",
 ]);
 
 /** @deprecated ADMIN_COMMANDS を使用してください */
