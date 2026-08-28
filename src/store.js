@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { buildLiverListUrl } from "./scraper.js";
 
 function initDataDir() {
   const preferred = process.env.DATA_DIR || "data";
@@ -65,8 +66,7 @@ export function defaultConfig() {
       maxHistoryEntries: 200,
       sortBy: "name",
       footerText: "X77live 大阪店 オンライン監視",
-      liveUrl:
-        "https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2",
+      liveUrl: buildLiverListUrl(1, process.env.SHOP_ID?.trim() || "4"),
     },
     lastNotifyAt: null,
     lastScrapeAt: null,

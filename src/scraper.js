@@ -5,11 +5,11 @@
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-const LIVER_LIST_BASE =
-  "https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2";
+const LIVER_LIST_URL = "https://x77.jp/live/twoshot_liverlist.php";
 const AGE_VERIFY_URL = "https://x77.jp/?mode=1";
 const ROSTER_URL = "https://www.dgdgdg.com/boy/list.php";
 const LIVER_LIST_PAGE_SIZE = 50;
+const DEFAULT_SHOP_ID = "4";
 
 /** @type {Map<string, string>} */
 const sessionCookies = new Map();
@@ -70,7 +70,7 @@ async function fetchPage(url, options = {}) {
   return res.text();
 }
 
-async function ensureSession() {
+async function ensureSession(shopId = DEFAULT_SHOP_ID) {
   const hasViewMode = sessionCookies.has("view_mode");
   if (
     hasViewMode &&
@@ -92,8 +92,9 @@ async function ensureSession() {
       .join("; ");
   }
 
+  const refUrl = buildLiverListUrl(1, shopId);
   const res = await fetch(
-    `${AGE_VERIFY_URL}&ref=${encodeURIComponent(LIVER_LIST_BASE)}`,
+    `${AGE_VERIFY_URL}&ref=${encodeURIComponent(refUrl)}`,
     { headers, redirect: "manual" }
   );
 
@@ -118,10 +119,14 @@ export function parseLiverListTotal(html) {
 
 /**
  * @param {number} [pageNo]
+ * @param {string} [shopId] dgdgdg shop_id（大阪店=4）
  * @returns {string}
  */
-export function buildLiverListUrl(pageNo = 1) {
-  const url = new URL(LIVER_LIST_BASE);
+export function buildLiverListUrl(pageNo = 1, shopId = DEFAULT_SHOP_ID) {
+  const url = new URL(LIVER_LIST_URL);
+  url.searchParams.set("search_tribe", "1");
+  url.searchParams.set("search_group_id", "2");
+  url.searchParams.set("search_shop_id", shopId);
   url.searchParams.set("search_page_max", String(LIVER_LIST_PAGE_SIZE));
   if (pageNo > 1) {
     url.searchParams.set("search_pageno", String(pageNo));
@@ -223,18 +228,18 @@ export async function fetchRoster(shopId) {
   return parseRosterPage(html);
 }
 
-async function fetchLiverListHtml(pageNo = 1) {
-  return fetchPage(buildLiverListUrl(pageNo));
+async function fetchLiverListHtml(pageNo = 1, shopId = DEFAULT_SHOP_ID) {
+  return fetchPage(buildLiverListUrl(pageNo, shopId));
 }
 
-export async function fetchLiveOnline() {
-  await ensureSession();
-  let html = await fetchLiverListHtml(1);
+export async function fetchLiveOnline(shopId = DEFAULT_SHOP_ID) {
+  await ensureSession(shopId);
+  let html = await fetchLiverListHtml(1, shopId);
 
   if (html.includes("年齢認証") && !html.includes("fvliver_list_top")) {
     sessionCookies.clear();
     await ensureSession();
-    html = await fetchLiverListHtml(1);
+    html = await fetchLiverListHtml(1, shopId);
   }
 
   const statuses = parseLivePage(html);
@@ -242,7 +247,7 @@ export async function fetchLiveOnline() {
   const totalPages = Math.max(1, Math.ceil(total / LIVER_LIST_PAGE_SIZE));
 
   for (let pageNo = 2; pageNo <= totalPages; pageNo++) {
-    const pageHtml = await fetchLiverListHtml(pageNo);
+    const pageHtml = await fetchLiverListHtml(pageNo, shopId);
     for (const [boyId, boy] of parseLivePage(pageHtml)) {
       statuses.set(boyId, boy);
     }
@@ -258,7 +263,7 @@ export async function fetchLiveOnline() {
 export async function scrapeOsakaStatuses(shopId, excludeIds = new Set()) {
   const [roster, online] = await Promise.all([
     fetchRoster(shopId),
-    fetchLiveOnline(),
+    fetchLiveOnline(shopId),
   ]);
 
   let statuses = mergeOsakaStatuses(roster, online);

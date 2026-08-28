@@ -1,6 +1,6 @@
 # X77live 大阪店 オンライン監視 Bot
 
-[x77.jp/live/twoshot_liverlist.php](https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2) から **関西エリア所属ライバー（大阪店）** の稼働状況を自動監視し、Discord に定期通知する Bot です。
+[x77.jp/live/twoshot_liverlist.php](https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2&search_shop_id=4) から **大阪店ボーイのみ** の稼働状況を自動監視し、Discord に定期通知する Bot です。
 
 ## 監視ステータス
 
@@ -13,7 +13,7 @@
 ## データソース
 
 - **ロスター（在籍ボーイ一覧）**: `dgdgdg.com/boy/list.php?shop_id=4`（大阪店）
-- **稼働状況**: `x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2`（関西エリア所属ライバー）
+- **稼働状況**: `x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2&search_shop_id=4`（大阪店所属ライバー）
 
 ## コマンド
 
