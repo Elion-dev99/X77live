@@ -1,4 +1,5 @@
 import { isOnlineStatus } from "./format.js";
+import path from "node:path";
 import {
   getBusinessSessionKey,
   getEndedSessionKey,
@@ -6,6 +7,7 @@ import {
 } from "./business-hours.js";
 import { buildDailySummaryEmbed } from "./format.js";
 import { addHistory } from "./store.js";
+import { saveDailyReportFiles } from "./daily-report-files.js";
 
 /**
  * @param {object} config
@@ -100,10 +102,13 @@ export async function maybeSendDailySummary(client, getConfig, persistConfig) {
       : { sessionKey, boys: {} };
 
   await sendDailySummaryNotification(client, config, stats);
+  const saved = saveDailyReportFiles(config, stats);
   addHistory(config, {
     type: "daily_summary",
     sessionKey,
     onlineCount: Object.keys(stats.boys || {}).length,
+    reportJson: path.basename(saved.jsonPath),
+    reportCsv: path.basename(saved.csvPath),
   });
 
   config.lastDailySummarySessionKey = sessionKey;

@@ -13,6 +13,10 @@ import { tickDailyStats } from "../src/daily-stats.js";
 import { defaultConfig } from "../src/store.js";
 import { STATUS } from "../src/scraper.js";
 import { buildNewBoyMessage, buildDailySummaryEmbed } from "../src/format.js";
+import { saveDailyReportFiles, buildDailyReportDocument, listDailyReportFiles } from "../src/daily-report-files.js";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
 function jstDate(y, m, d, h, min = 0) {
   return new Date(Date.UTC(y, m - 1, d, h - 9, min));
@@ -116,5 +120,58 @@ describe("format new features", () => {
     assert.match(text, /太郎/);
     assert.match(text, /2時間/);
     assert.match(text, /次郎/);
+  });
+});
+
+describe("daily-report-files", () => {
+  it("saveDailyReportFiles writes json, csv, and index", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "x77-reports-"));
+    const reportsDir = path.join(tmpDir, "reports");
+
+    const config = defaultConfig();
+    const stats = {
+      sessionKey: "2026-08-28",
+      boys: {
+        "10235": { name: "つむぎ", onlineMinutes: 150 },
+        "10001": { name: "太郎", onlineMinutes: 60 },
+      },
+    };
+
+    const saved = saveDailyReportFiles(
+      config,
+      stats,
+      jstDate(2026, 8, 29, 1, 0),
+      reportsDir
+    );
+    assert.ok(fs.existsSync(saved.jsonPath));
+    assert.ok(fs.existsSync(saved.csvPath));
+
+    const report = JSON.parse(fs.readFileSync(saved.jsonPath, "utf8"));
+    assert.equal(report.sessionKey, "2026-08-28");
+    assert.equal(report.boys[0].name, "つむぎ");
+    assert.equal(report.boys[0].onlineMinutes, 150);
+
+    const csv = fs.readFileSync(saved.csvPath, "utf8");
+    assert.match(csv, /つむぎ/);
+    assert.match(csv, /10235/);
+
+    const index = listDailyReportFiles(reportsDir);
+    assert.equal(index.length, 1);
+    assert.equal(index[0].sessionKey, "2026-08-28");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("buildDailyReportDocument sorts by online minutes", () => {
+    const config = defaultConfig();
+    const report = buildDailyReportDocument(config, {
+      sessionKey: "2026-08-28",
+      boys: {
+        a: { name: "B", onlineMinutes: 10 },
+        b: { name: "A", onlineMinutes: 20 },
+      },
+    });
+    assert.equal(report.boys[0].name, "A");
+    assert.equal(report.boys[1].name, "B");
   });
 });
