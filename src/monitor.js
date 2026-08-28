@@ -3,6 +3,7 @@ import { addHistory, saveConfig } from "./store.js";
 import { sendStatusChangeNotification, sendNewBoyNotification } from "./notifier.js";
 import { buildBoyStatusChangeMessage, isOnlineStatus } from "./format.js";
 import { tickDailyStats } from "./daily-stats.js";
+import { handleScrapeSuccess, handleScrapeFailure } from "./scrape-health.js";
 
 /** @type {ReturnType<typeof setInterval>|null} */
 let pollHandle = null;
@@ -124,51 +125,59 @@ export async function runScrape(getConfig, persistConfig, client = null) {
       .map(([id]) => id)
   );
 
-  const data = await scrapeOsakaStatuses(shopId, excludeIds);
-  const newBoys = detectNewBoys(config, data.roster);
-  const prevStatuses = { ...(config.boyStatuses || {}) };
-  const statuses = applyScrapeResult(config, data);
-  const changes = detectChanges({ boyStatuses: prevStatuses }, statuses);
+  try {
+    const data = await scrapeOsakaStatuses(shopId, excludeIds);
+    const newBoys = detectNewBoys(config, data.roster);
+    const prevStatuses = { ...(config.boyStatuses || {}) };
+    const statuses = applyScrapeResult(config, data);
+    const changes = detectChanges({ boyStatuses: prevStatuses }, statuses);
 
-  tickDailyStats(config, statuses);
+    tickDailyStats(config, statuses);
 
-  for (const change of changes) {
-    addHistory(config, {
-      type: "status_change",
-      boyId: change.boyId,
-      name: change.name,
-      from: change.from,
-      to: change.to,
-    });
-  }
-
-  persistConfig();
-
-  if (client && newBoys.length > 0 && config.settings.pingOnNewBoy !== false) {
-    for (const boy of newBoys) {
-      addHistory(config, {
-        type: "boy_new",
-        boyId: boy.boyId,
-        name: boy.name,
-      });
-      await sendNewBoyNotification(client, config, boy);
-    }
-    persistConfig();
-  }
-
-  if (client && config.settings.pingOnStatusChange && changes.length > 0) {
     for (const change of changes) {
-      if (!isOnlineStatus(change.to)) continue;
-      const msg = buildBoyStatusChangeMessage(change);
-      await sendStatusChangeNotification(client, config, msg);
+      addHistory(config, {
+        type: "status_change",
+        boyId: change.boyId,
+        name: change.name,
+        from: change.from,
+        to: change.to,
+      });
     }
+
+    persistConfig();
+
+    if (client && newBoys.length > 0 && config.settings.pingOnNewBoy !== false) {
+      for (const boy of newBoys) {
+        addHistory(config, {
+          type: "boy_new",
+          boyId: boy.boyId,
+          name: boy.name,
+        });
+        await sendNewBoyNotification(client, config, boy);
+      }
+      persistConfig();
+    }
+
+    if (client && config.settings.pingOnStatusChange && changes.length > 0) {
+      for (const change of changes) {
+        if (!isOnlineStatus(change.to)) continue;
+        const msg = buildBoyStatusChangeMessage(change);
+        await sendStatusChangeNotification(client, config, msg);
+      }
+    }
+
+    await handleScrapeSuccess(config, client, persistConfig);
+
+    console.log(
+      `[monitor] スクレイプ完了: 待機${config.lastSummary.waiting} / 通話${config.lastSummary.inCall} / オフライン${config.lastSummary.offline}`
+    );
+
+    return { statuses, changes, summary: config.lastSummary };
+  } catch (err) {
+    await handleScrapeFailure(config, client, persistConfig, err);
+    console.error("[monitor] スクレイプ失敗:", err.message);
+    return { error: err.message };
   }
-
-  console.log(
-    `[monitor] スクレイプ完了: 待機${config.lastSummary.waiting} / 通話${config.lastSummary.inCall} / オフライン${config.lastSummary.offline}`
-  );
-
-  return { statuses, changes, summary: config.lastSummary };
 }
 
 export function startMonitor(client, getConfig, persistConfig) {
