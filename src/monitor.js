@@ -1,0 +1,167 @@
+import { scrapeOsakaStatuses, STATUS } from "./scraper.js";
+import { addHistory, saveConfig } from "./store.js";
+import { sendStatusChangeNotification } from "./notifier.js";
+import { buildBoyStatusChangeMessage } from "./format.js";
+
+/** @type {ReturnType<typeof setInterval>|null} */
+let pollHandle = null;
+
+/** @type {import('discord.js').Client|null} */
+let clientRef = null;
+
+/** @type {(() => object)|null} */
+let getConfigFn = null;
+
+/** @type {(() => void)|null} */
+let persistConfigFn = null;
+
+/**
+ * @param {object} config
+ * @param {Array<{ boyId: string, name: string, status: string }>} statuses
+ */
+function detectChanges(config, statuses) {
+  /** @type {Array<{ boyId: string, name: string, from: string, to: string }>} */
+  const changes = [];
+  const prev = config.boyStatuses || {};
+
+  for (const boy of statuses) {
+    const oldStatus = prev[boy.boyId]?.status;
+    if (oldStatus && oldStatus !== boy.status) {
+      changes.push({
+        boyId: boy.boyId,
+        name: boy.name,
+        from: oldStatus,
+        to: boy.status,
+      });
+    }
+  }
+
+  return changes;
+}
+
+/**
+ * @param {object} config
+ * @param {Awaited<ReturnType<typeof scrapeOsakaStatuses>>} data
+ */
+function applyScrapeResult(config, data) {
+  config.boys = config.boys || {};
+  config.boyStatuses = config.boyStatuses || {};
+
+  for (const [boyId, info] of data.roster) {
+    if (!config.boys[boyId]) {
+      config.boys[boyId] = {
+        name: info.name,
+        excluded: false,
+        addedAt: new Date().toISOString(),
+      };
+    } else if (info.name && !config.boys[boyId].name) {
+      config.boys[boyId].name = info.name;
+    }
+  }
+
+  const excludeIds = new Set(
+    Object.entries(config.boys)
+      .filter(([, b]) => b.excluded)
+      .map(([id]) => id)
+  );
+
+  const filtered = data.statuses.filter((b) => !excludeIds.has(b.boyId));
+
+  for (const boy of filtered) {
+    config.boyStatuses[boy.boyId] = {
+      name: boy.name,
+      liveName: boy.liveName || null,
+      status: boy.status,
+      updatedAt: data.scrapedAt,
+    };
+  }
+
+  config.lastScrapeAt = data.scrapedAt;
+  config.lastSummary = {
+    ...data.summary,
+    total: filtered.length,
+    waiting: filtered.filter((b) => b.status === STATUS.WAITING).length,
+    inCall: filtered.filter((b) => b.status === STATUS.IN_CALL).length,
+    offline: filtered.filter((b) => b.status === STATUS.OFFLINE).length,
+  };
+
+  return filtered;
+}
+
+export async function runScrape(getConfig, persistConfig, client = null) {
+  const config = getConfig();
+  const shopId = config.shopId || "4";
+
+  const excludeIds = new Set(
+    Object.entries(config.boys || {})
+      .filter(([, b]) => b.excluded)
+      .map(([id]) => id)
+  );
+
+  const data = await scrapeOsakaStatuses(shopId, excludeIds);
+  const prevStatuses = { ...(config.boyStatuses || {}) };
+  const statuses = applyScrapeResult(config, data);
+  const changes = detectChanges({ boyStatuses: prevStatuses }, statuses);
+
+  for (const change of changes) {
+    addHistory(config, {
+      type: "status_change",
+      boyId: change.boyId,
+      name: change.name,
+      from: change.from,
+      to: change.to,
+    });
+  }
+
+  persistConfig();
+
+  if (client && config.settings.pingOnStatusChange && changes.length > 0) {
+    for (const change of changes) {
+      const msg = buildBoyStatusChangeMessage(change);
+      await sendStatusChangeNotification(client, config, msg);
+    }
+  }
+
+  console.log(
+    `[monitor] スクレイプ完了: 待機${config.lastSummary.waiting} / 通話${config.lastSummary.inCall} / オフライン${config.lastSummary.offline}`
+  );
+
+  return { statuses, changes, summary: config.lastSummary };
+}
+
+export function startMonitor(client, getConfig, persistConfig) {
+  stopMonitor();
+  clientRef = client;
+  getConfigFn = getConfig;
+  persistConfigFn = persistConfig;
+
+  const config = getConfig();
+  const intervalMs = (config.pollIntervalMinutes || 2) * 60 * 1000;
+
+  console.log(`[monitor] 監視開始: ${config.pollIntervalMinutes || 2}分間隔`);
+
+  runScrape(getConfig, persistConfig, client).catch((err) => {
+    console.error("[monitor] 初回スクレイプ失敗:", err.message);
+  });
+
+  pollHandle = setInterval(() => {
+    runScrape(getConfig, persistConfig, client).catch((err) => {
+      console.error("[monitor] スクレイプ失敗:", err.message);
+    });
+  }, intervalMs);
+}
+
+export function stopMonitor() {
+  if (pollHandle) {
+    clearInterval(pollHandle);
+    pollHandle = null;
+    console.log("[monitor] 監視停止");
+  }
+}
+
+export function restartMonitor(client, getConfig, persistConfig) {
+  stopMonitor();
+  startMonitor(client, getConfig, persistConfig);
+}
+
+export { STATUS };
