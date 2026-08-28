@@ -188,6 +188,17 @@ export function buildSlashCommands() {
       .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
+      .setName("設定復元")
+      .setDescription("config.json の最新バックアップから設定を復元")
+      .addStringOption((opt) =>
+        opt
+          .setName("バックアップ")
+          .setDescription("ファイル名（省略時は config-latest.json）")
+          .setRequired(false)
+      )
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
       .setName("ヘルプ")
       .setDescription("コマンド一覧と使い方"),
   ].map((cmd) => cmd.toJSON());
@@ -280,6 +291,12 @@ export function parseSlashInteraction(interaction) {
       return {
         command: "report_interim",
         format: interaction.options.getString("形式") || "view",
+        password: getPassword(interaction),
+      };
+    case "設定復元":
+      return {
+        command: "restore_config",
+        backupName: interaction.options.getString("バックアップ"),
         password: getPassword(interaction),
       };
     case "ヘルプ":

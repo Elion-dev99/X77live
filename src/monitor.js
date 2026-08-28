@@ -4,6 +4,7 @@ import { sendStatusChangeNotification, sendNewBoyNotification } from "./notifier
 import { buildBoyStatusChangeMessage, isOnlineStatus } from "./format.js";
 import { tickDailyStats } from "./daily-stats.js";
 import { handleScrapeSuccess, handleScrapeFailure } from "./scrape-health.js";
+import { markBotLivenessHealthy } from "./bot-liveness.js";
 
 /** @type {ReturnType<typeof setInterval>|null} */
 let pollHandle = null;
@@ -167,6 +168,8 @@ export async function runScrape(getConfig, persistConfig, client = null) {
     }
 
     await handleScrapeSuccess(config, client, persistConfig);
+    markBotLivenessHealthy(config);
+    persistConfig();
 
     console.log(
       `[monitor] スクレイプ完了: 待機${config.lastSummary.waiting} / 通話${config.lastSummary.inCall} / オフライン${config.lastSummary.offline}`

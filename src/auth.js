@@ -14,6 +14,7 @@ export const ADMIN_COMMANDS = new Set([
   "report_list",
   "report_download",
   "report_interim",
+  "restore_config",
 ]);
 
 /** @deprecated ADMIN_COMMANDS を使用してください */

@@ -47,6 +47,11 @@
 | `REPORT_BACKUP_INTERVAL_HOURS` | 任意 | 営業中バックアップ間隔（時間）。デフォルト `3` |
 | `REPORT_BACKUP_ENABLED` | 任意 | 自動バックアップ。デフォルト `true` |
 | `REPORT_BACKUP_NOTIFY_ADMIN` | 任意 | バックアップ完了を管理者 DM。デフォルト `true` |
+| `CONFIG_BACKUP_INTERVAL_HOURS` | 任意 | config.json 自動バックアップ間隔（時間）。デフォルト `3` |
+| `CONFIG_BACKUP_ENABLED` | 任意 | config 自動バックアップ。デフォルト `true` |
+| `BOT_LIVENESS_MINUTES` | 任意 | 監視停止とみなす分数。デフォルト `10` |
+| `BOT_LIVENESS_ENABLED` | 任意 | Bot 死活監視（管理者 DM）。デフォルト `true` |
+| `WEEKLY_SUMMARY_ENABLED` | 任意 | 週次レポート（日曜営業終了後=月01:00）。デフォルト `true` |
 
 ### 管理者 DM（ADMIN_USER_ID）の取得
 

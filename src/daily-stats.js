@@ -1,5 +1,6 @@
 import { isOnlineStatus } from "./format.js";
 import path from "node:path";
+import { STATUS } from "./scraper.js";
 import {
   getBusinessSessionKey,
   getEndedSessionKey,
@@ -8,6 +9,34 @@ import {
 import { buildDailySummaryEmbed } from "./format.js";
 import { addHistory } from "./store.js";
 import { saveDailyReportFiles } from "./daily-report-files.js";
+import { maybeSendWeeklySummary } from "./weekly-report.js";
+
+function ensureBoyStat(boys, boyId, name) {
+  if (!boys[boyId]) {
+    boys[boyId] = {
+      name,
+      onlineMinutes: 0,
+      waitingMinutes: 0,
+      inCallMinutes: 0,
+    };
+    return;
+  }
+  boys[boyId].name = name;
+  if (!Number.isFinite(boys[boyId].waitingMinutes)) boys[boyId].waitingMinutes = 0;
+  if (!Number.isFinite(boys[boyId].inCallMinutes)) boys[boyId].inCallMinutes = 0;
+  if (!Number.isFinite(boys[boyId].onlineMinutes)) boys[boyId].onlineMinutes = 0;
+}
+
+function accumulateBoyMinutes(boys, boy, deltaMinutes) {
+  ensureBoyStat(boys, boy.boyId, boy.name);
+  if (boy.status === STATUS.WAITING) {
+    boys[boy.boyId].waitingMinutes += deltaMinutes;
+    boys[boy.boyId].onlineMinutes += deltaMinutes;
+  } else if (boy.status === STATUS.IN_CALL) {
+    boys[boy.boyId].inCallMinutes += deltaMinutes;
+    boys[boy.boyId].onlineMinutes += deltaMinutes;
+  }
+}
 
 /**
  * @param {object} config
@@ -50,11 +79,7 @@ export function tickDailyStats(config, statuses, now = new Date()) {
 
   for (const boy of statuses) {
     if (!isOnlineStatus(boy.status)) continue;
-    if (!current.boys[boy.boyId]) {
-      current.boys[boy.boyId] = { name: boy.name, onlineMinutes: 0 };
-    }
-    current.boys[boy.boyId].name = boy.name;
-    current.boys[boy.boyId].onlineMinutes += deltaMinutes;
+    accumulateBoyMinutes(current.boys, boy, deltaMinutes);
   }
 
   current.lastTickAt = now.toISOString();
@@ -140,6 +165,8 @@ export async function maybeSendDailySummary(client, getConfig, persistConfig) {
     lastTickAt: null,
   };
   persistConfig();
+
+  await maybeSendWeeklySummary(client, getConfig, persistConfig);
 }
 
 export async function sendDailySummaryNotification(client, config, stats) {

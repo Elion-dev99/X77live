@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import { getMonitoredBoys, getBoysByStatus } from "./store.js";
 import { STATUS } from "./scraper.js";
-import { formatDurationMinutes, formatSessionPeriod } from "./business-hours.js";
+import { formatDurationMinutes, formatSessionPeriod, formatWeekPeriod } from "./business-hours.js";
 
 function sortBoys(boys, sortBy) {
   const sorted = [...boys];
@@ -201,6 +201,8 @@ export function buildDailySummaryEmbed(config, stats, options = {}) {
       boyId,
       name: info.name,
       onlineMinutes: info.onlineMinutes || 0,
+      waitingMinutes: info.waitingMinutes || 0,
+      inCallMinutes: info.inCallMinutes || 0,
     }))
     .sort(
       (a, b) =>
@@ -247,10 +249,12 @@ export function buildDailySummaryEmbed(config, stats, options = {}) {
   descParts.push(`オンライン稼働: **${entries.length}** 名`);
   embed.setDescription(descParts.join("\n"));
 
-  const lines = entries.map(
-    (e, i) =>
-      `${i + 1}. **${e.name}** — ${formatDurationMinutes(e.onlineMinutes)}`
-  );
+  const lines = entries.map((e, i) => {
+    const total = formatDurationMinutes(e.onlineMinutes);
+    const waiting = formatDurationMinutes(e.waitingMinutes);
+    const inCall = formatDurationMinutes(e.inCallMinutes);
+    return `${i + 1}. **${e.name}** — ${total}（待機 ${waiting} / 通話 ${inCall}）`;
+  });
 
   let chunk = "";
   let fieldIndex = 1;
@@ -276,6 +280,49 @@ export function buildDailySummaryEmbed(config, stats, options = {}) {
 
   embed.setFooter({
     text: `${config.settings.footerText} | 合計 ${formatDurationMinutes(totalMinutes)}`,
+  });
+
+  return embed;
+}
+
+export function buildWeeklySummaryEmbed(config, weeklyStats) {
+  const settings = config.settings || {};
+  const period = weeklyStats.period?.label
+    || formatWeekPeriod(weeklyStats.weekStart, weeklyStats.weekEnd, settings);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📅 ${config.storeName} — 週間オンライン稼働サマリー`)
+    .setColor(config.settings.embedColorSummary)
+    .setTimestamp(new Date());
+
+  const entries = weeklyStats.boys || [];
+  if (entries.length === 0) {
+    embed.setDescription(`対象週: ${period}\n\n_稼働記録がありませんでした_`);
+    return embed;
+  }
+
+  embed.setDescription(
+    [
+      `対象週: ${period}`,
+      `集計営業日: **${weeklyStats.loadedDays}** / 7 日`,
+      `オンライン稼働: **${entries.length}** 名`,
+    ].join("\n")
+  );
+
+  const lines = entries.slice(0, 20).map((e, i) => {
+    const total = formatDurationMinutes(e.onlineMinutes);
+    const waiting = formatDurationMinutes(e.waitingMinutes);
+    const inCall = formatDurationMinutes(e.inCallMinutes);
+    return `${i + 1}. **${e.name}** — ${total}（待機 ${waiting} / 通話 ${inCall}）`;
+  });
+
+  embed.addFields({
+    name: "週間稼働ランキング",
+    value: lines.join("\n").slice(0, 1024),
+  });
+
+  embed.setFooter({
+    text: `${config.settings.footerText} | 合計 ${formatDurationMinutes(weeklyStats.totalOnlineMinutes)}`,
   });
 
   return embed;

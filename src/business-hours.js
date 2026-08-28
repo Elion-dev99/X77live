@@ -106,3 +106,32 @@ export function shouldSendDailySummaryNow(date = new Date(), settings = {}) {
   if (hour !== summaryHour) return false;
   return minute >= summaryMinute && minute < summaryMinute + 5;
 }
+
+/** sessionKey (YYYY-MM-DD) の曜日。0=日曜 */
+export function getSessionKeyDayOfWeek(sessionKey) {
+  const [y, m, d] = sessionKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+export function isSundaySessionKey(sessionKey) {
+  return getSessionKeyDayOfWeek(sessionKey) === 0;
+}
+
+/** 月曜〜日曜の7営業日キー（末尾が weekEndSessionKey） */
+export function getWeekSessionKeys(weekEndSessionKey) {
+  const [y, m, d] = weekEndSessionKey.split("-").map(Number);
+  const keys = [];
+  for (let delta = -6; delta <= 0; delta += 1) {
+    keys.push(formatDateKey(addCalendarDays(y, m, d, delta)));
+  }
+  return keys;
+}
+
+export function formatWeekPeriod(weekStart, weekEnd, settings = {}) {
+  const open = settings.businessHoursOpen || "13:00";
+  const close = settings.businessHoursClose || "01:00";
+  const [sy, sm, sd] = weekStart.split("-").map(Number);
+  const [ey, em, ed] = weekEnd.split("-").map(Number);
+  const endNext = addCalendarDays(ey, em, ed, 1);
+  return `${sm}/${sd} ${open} 〜 ${endNext.month}/${endNext.day} ${close}（月〜日）`;
+}
