@@ -117,7 +117,7 @@ describe("auth", () => {
 describe("slash-commands auth options", () => {
   it("admin commands expose optional password option", () => {
     const commands = buildSlashCommands();
-    const adminNames = ["更新", "履歴", "設定", "設定確認", "通知テスト", "監視除外", "監視再開", "再起動"];
+    const adminNames = ["更新", "履歴", "設定", "設定確認", "通知テスト", "監視除外", "監視再開", "再起動", "レポート一覧", "レポート取得"];
 
     for (const name of adminNames) {
       const cmd = commands.find((c) => c.name === name);

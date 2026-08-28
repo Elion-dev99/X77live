@@ -168,3 +168,60 @@ export function listDailyReportFiles(reportsDir = REPORTS_DIR) {
     return [];
   }
 }
+
+export const SESSION_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function normalizeSessionKey(input) {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!SESSION_KEY_RE.test(trimmed)) return null;
+  return trimmed;
+}
+
+export function getLatestSessionKey(reportsDir = REPORTS_DIR) {
+  const list = listDailyReportFiles(reportsDir);
+  return list.at(-1)?.sessionKey || null;
+}
+
+function resolveReportPath(reportsDir, sessionKey, ext) {
+  if (!normalizeSessionKey(sessionKey)) return null;
+  const filePath = path.resolve(reportsDir, `${sessionKey}.${ext}`);
+  if (!filePath.startsWith(path.resolve(reportsDir) + path.sep)) {
+    return null;
+  }
+  return fs.existsSync(filePath) ? filePath : null;
+}
+
+/**
+ * @param {"json"|"csv"|"both"} format
+ * @returns {{ sessionKey: string, files: Array<{ path: string, name: string }> } | null}
+ */
+export function resolveReportDownload(sessionKey, format = "both", reportsDir = REPORTS_DIR) {
+  const key = normalizeSessionKey(sessionKey);
+  if (!key) return null;
+
+  /** @type {Array<{ path: string, name: string }>} */
+  const files = [];
+
+  if (format === "json" || format === "both") {
+    const jsonPath = resolveReportPath(reportsDir, key, "json");
+    if (jsonPath) files.push({ path: jsonPath, name: `${key}.json` });
+  }
+  if (format === "csv" || format === "both") {
+    const csvPath = resolveReportPath(reportsDir, key, "csv");
+    if (csvPath) files.push({ path: csvPath, name: `${key}.csv` });
+  }
+
+  if (files.length === 0) return null;
+  return { sessionKey: key, files };
+}
+
+export function loadReportDocument(sessionKey, reportsDir = REPORTS_DIR) {
+  const jsonPath = resolveReportPath(reportsDir, sessionKey, "json");
+  if (!jsonPath) return null;
+  try {
+    return JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+  } catch {
+    return null;
+  }
+}

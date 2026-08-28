@@ -288,6 +288,34 @@ export function buildMemberListEmbed(config) {
   return embed;
 }
 
+export function buildReportListEmbed(config, reports) {
+  const embed = new EmbedBuilder()
+    .setTitle(`📁 ${config.storeName} — 営業日レポート一覧`)
+    .setColor(config.settings.embedColorSummary)
+    .setTimestamp(new Date());
+
+  if (!reports.length) {
+    embed.setDescription(
+      "_保存済みレポートがありません。毎日 01:00 に自動生成されます。_"
+    );
+    return embed;
+  }
+
+  const lines = reports.map((entry) => {
+    const mins =
+      entry.totalOnlineMinutes != null
+        ? ` / 合計 ${formatDurationMinutes(entry.totalOnlineMinutes)}`
+        : "";
+    return `• **${entry.sessionKey}** — ${entry.period}（${entry.onlineCount}名${mins}）`;
+  });
+
+  embed.setDescription(lines.join("\n").slice(0, 4000));
+  embed.setFooter({
+    text: "`/レポート取得 営業日:YYYY-MM-DD 形式:CSV` でダウンロード",
+  });
+  return embed;
+}
+
 export function buildSettingsEmbed(config) {
   const embed = new EmbedBuilder()
     .setTitle("⚙️ 現在の設定")
