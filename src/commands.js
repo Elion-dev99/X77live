@@ -17,7 +17,8 @@ import {
 } from "./notifier.js";
 import { runScrape, restartMonitor } from "./monitor.js";
 import {
-  requireCustomizeAuth,
+  requireAdminAuth,
+  ADMIN_COMMANDS,
   verifyPassword,
   authenticateUser,
   logoutUser,
@@ -58,9 +59,9 @@ function authError(result) {
   };
 }
 
-function checkCustomizeAuth(interaction, password) {
+function checkAdminAuth(interaction, password) {
   const config = getConfig();
-  const result = requireCustomizeAuth(interaction, config, password);
+  const result = requireAdminAuth(interaction, config, password);
   if (!result.ok) {
     return authError(result);
   }
@@ -68,8 +69,18 @@ function checkCustomizeAuth(interaction, password) {
   return null;
 }
 
+/** change_password は現在のパスワードで別途認証する */
+function needsAdminAuth(command) {
+  return ADMIN_COMMANDS.has(command) && command !== "change_password";
+}
+
 export async function handleCommand(interaction, parsed) {
   const config = getConfig();
+
+  if (needsAdminAuth(parsed.command)) {
+    const denied = checkAdminAuth(interaction, parsed.password);
+    if (denied) return denied;
+  }
 
   switch (parsed.command) {
     case "status":
@@ -82,10 +93,11 @@ export async function handleCommand(interaction, parsed) {
       return {
         type: "embed",
         embed: buildHistoryEmbed(config, parsed.limit),
+        ephemeral: true,
       };
 
     case "refresh": {
-      await interaction.deferReply();
+      await interaction.deferReply({ ephemeral: true });
       try {
         const result = await runScrape(getConfig, persistConfig, clientRef);
         const s = result.summary;
@@ -94,6 +106,7 @@ export async function handleCommand(interaction, parsed) {
           interaction,
           content: `✅ x77.jp から最新データを取得しました\n🟢 待機中: **${s.waiting}** / 📞 通話中: **${s.inCall}** / ⚪ オフライン: **${s.offline}**`,
           embed: buildStatusEmbed(getConfig()),
+          ephemeral: true,
         };
       } catch (err) {
         return {
@@ -131,7 +144,7 @@ export async function handleCommand(interaction, parsed) {
       });
       return {
         type: "text",
-        content: `✅ 認証しました（有効期限: ${time} まで）\nカスタマイズコマンドが使えます。`,
+        content: `✅ 認証しました（有効期限: ${time} まで）\n管理者コマンドが使えます。`,
         ephemeral: true,
       };
     }
@@ -182,9 +195,6 @@ export async function handleCommand(interaction, parsed) {
     }
 
     case "exclude_boy": {
-      const denied = checkCustomizeAuth(interaction, parsed.password);
-      if (denied) return denied;
-
       const boyId = parsed.boyId;
       if (!config.boys[boyId] && !config.boyStatuses[boyId]) {
         return {
@@ -216,9 +226,6 @@ export async function handleCommand(interaction, parsed) {
     }
 
     case "include_boy": {
-      const denied = checkCustomizeAuth(interaction, parsed.password);
-      if (denied) return denied;
-
       const boyId = parsed.boyId;
       if (!config.boys[boyId]) {
         return {
@@ -246,9 +253,6 @@ export async function handleCommand(interaction, parsed) {
     }
 
     case "setting": {
-      const denied = checkCustomizeAuth(interaction, parsed.password);
-      if (denied) return denied;
-
       let value = parsed.value;
 
       if (parsed.key === "notifyChannel") {
@@ -307,20 +311,15 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
-    case "settings_show": {
-      const denied = checkCustomizeAuth(interaction, parsed.password);
-      if (denied) return denied;
+    case "settings_show":
       return {
         type: "embed",
         embed: buildSettingsEmbed(config),
         ephemeral: true,
       };
-    }
 
     case "notify_test": {
-      const denied = checkCustomizeAuth(interaction, parsed.password);
-      if (denied) return denied;
-
+      await interaction.deferReply({ ephemeral: true });
       await runScrape(getConfig, persistConfig, clientRef);
 
       if (clientRef) {
@@ -328,7 +327,8 @@ export async function handleCommand(interaction, parsed) {
       }
 
       return {
-        type: "text",
+        type: "deferred",
+        interaction,
         content: "✅ 最新データを取得し、通知テストを送信しました。",
         ephemeral: true,
       };
@@ -341,10 +341,11 @@ export async function handleCommand(interaction, parsed) {
           "## 📡 X77live 大阪店 オンライン監視Bot",
           "",
           "### 一般コマンド（誰でも可）",
-          "• `/状況` `/一覧` `/更新` `/履歴`",
+          "• `/状況` `/一覧` `/ヘルプ`",
           "",
-          "### カスタマイズコマンド（🔒 パスワード必須）",
+          "### 管理者コマンド（🔒 パスワード必須）",
           "• `/認証` — パスワードでログイン（セッション有効）",
+          "• `/更新` `/履歴`",
           "• `/設定` `/設定確認` `/通知テスト`",
           "• `/監視除外` `/監視再開` `/パスワード変更`",
           "• `/ログアウト` — セッション終了",

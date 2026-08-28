@@ -1,16 +1,19 @@
 import crypto from "node:crypto";
 
-const SESSION_MS_DEFAULT = 8 * 60 * 60 * 1000;
-
-/** カスタマイズ系コマンド */
-export const CUSTOMIZE_COMMANDS = new Set([
+/** パスワードまたはセッションが必要な管理者コマンド */
+export const ADMIN_COMMANDS = new Set([
   "setting",
   "settings_show",
   "notify_test",
   "exclude_boy",
   "include_boy",
   "change_password",
+  "refresh",
+  "history",
 ]);
+
+/** @deprecated ADMIN_COMMANDS を使用してください */
+export const CUSTOMIZE_COMMANDS = ADMIN_COMMANDS;
 
 export function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString("hex");
@@ -88,7 +91,7 @@ export function logoutUser(userId, config) {
 /**
  * @returns {{ ok: true } | { ok: false, message: string, ephemeral?: boolean }}
  */
-export function requireCustomizeAuth(interaction, config, password) {
+export function requireAdminAuth(interaction, config, password) {
   if (!isPasswordConfigured(config)) {
     return {
       ok: false,
@@ -120,10 +123,13 @@ export function requireCustomizeAuth(interaction, config, password) {
   return {
     ok: false,
     message:
-      "🔒 このコマンドには管理パスワードが必要です。\n`/認証 パスワード:****` でログインするか、コマンドに `パスワード` を付けて実行してください。",
+      "🔒 このコマンドは管理者専用です。\n`/認証 パスワード:****` でログインするか、コマンドに `パスワード` を付けて実行してください。",
     ephemeral: true,
   };
 }
+
+/** @deprecated requireAdminAuth を使用してください */
+export const requireCustomizeAuth = requireAdminAuth;
 
 export function getSessionExpiry(userId, config) {
   cleanupExpiredSessions(config);

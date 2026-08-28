@@ -6,10 +6,12 @@ import {
   authenticateUser,
   isAuthenticated,
   logoutUser,
-  requireCustomizeAuth,
+  requireAdminAuth,
   initPasswordFromEnv,
+  ADMIN_COMMANDS,
 } from "../src/auth.js";
 import { defaultConfig } from "../src/store.js";
+import { buildSlashCommands, parseSlashInteraction } from "../src/slash-commands.js";
 
 describe("auth", () => {
   it("creates and verifies password hash", () => {
@@ -37,27 +39,28 @@ describe("auth", () => {
     assert.equal(isAuthenticated("user1", config), false);
   });
 
-  it("requireCustomizeAuth accepts password inline", () => {
+  it("requireAdminAuth accepts password inline", () => {
     const config = defaultConfig();
     const record = createPasswordRecord("mypass");
     config.auth.passwordSalt = record.passwordSalt;
     config.auth.passwordHash = record.passwordHash;
 
     const interaction = { user: { id: "u1" } };
-    const ok = requireCustomizeAuth(interaction, config, "mypass");
+    const ok = requireAdminAuth(interaction, config, "mypass");
     assert.equal(ok.ok, true);
     assert.equal(isAuthenticated("u1", config), true);
   });
 
-  it("requireCustomizeAuth rejects without auth", () => {
+  it("requireAdminAuth rejects without auth", () => {
     const config = defaultConfig();
     const record = createPasswordRecord("mypass");
     config.auth.passwordSalt = record.passwordSalt;
     config.auth.passwordHash = record.passwordHash;
 
     const interaction = { user: { id: "u1" } };
-    const result = requireCustomizeAuth(interaction, config);
+    const result = requireAdminAuth(interaction, config);
     assert.equal(result.ok, false);
+    assert.match(result.message, /管理者専用/);
   });
 
   it("initPasswordFromEnv sets hash once", () => {
@@ -75,5 +78,41 @@ describe("auth", () => {
       if (original === undefined) delete process.env.ADMIN_PASSWORD;
       else process.env.ADMIN_PASSWORD = original;
     }
+  });
+
+  it("ADMIN_COMMANDS includes refresh and history", () => {
+    assert.ok(ADMIN_COMMANDS.has("refresh"));
+    assert.ok(ADMIN_COMMANDS.has("history"));
+    assert.ok(ADMIN_COMMANDS.has("setting"));
+    assert.ok(!ADMIN_COMMANDS.has("status"));
+    assert.ok(!ADMIN_COMMANDS.has("members"));
+  });
+});
+
+describe("slash-commands auth options", () => {
+  it("admin commands expose optional password option", () => {
+    const commands = buildSlashCommands();
+    const adminNames = ["更新", "履歴", "設定", "設定確認", "通知テスト", "監視除外", "監視再開"];
+
+    for (const name of adminNames) {
+      const cmd = commands.find((c) => c.name === name);
+      assert.ok(cmd, `missing command: ${name}`);
+      assert.ok(
+        cmd.options?.some((o) => o.name === "パスワード"),
+        `${name} should have パスワード option`
+      );
+    }
+  });
+
+  it("parseSlashInteraction passes password for refresh", () => {
+    const parsed = parseSlashInteraction({
+      commandName: "更新",
+      options: {
+        getString: (name) => (name === "パスワード" ? "secret" : null),
+        getInteger: () => null,
+      },
+    });
+    assert.equal(parsed.command, "refresh");
+    assert.equal(parsed.password, "secret");
   });
 });

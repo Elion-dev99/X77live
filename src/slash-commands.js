@@ -1,6 +1,4 @@
-import {
-  SlashCommandBuilder,
-} from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 function passwordOption(required = false) {
   return (opt) =>
@@ -22,7 +20,8 @@ export function buildSlashCommands() {
 
     new SlashCommandBuilder()
       .setName("更新")
-      .setDescription("x77.jp から最新の稼働状況を即時取得"),
+      .setDescription("x77.jp から最新の稼働状況を即時取得")
+      .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
       .setName("履歴")
@@ -34,11 +33,12 @@ export function buildSlashCommands() {
           .setMinValue(1)
           .setMaxValue(50)
           .setRequired(false)
-      ),
+      )
+      .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
       .setName("認証")
-      .setDescription("管理パスワードでログイン（カスタマイズ操作用）")
+      .setDescription("管理パスワードでログイン（管理者コマンド用）")
       .addStringOption((opt) =>
         opt
           .setName("パスワード")
@@ -149,11 +149,15 @@ export function parseSlashInteraction(interaction) {
     case "一覧":
       return { command: "members" };
     case "更新":
-      return { command: "refresh" };
+      return {
+        command: "refresh",
+        password: getPassword(interaction),
+      };
     case "履歴":
       return {
         command: "history",
         limit: interaction.options.getInteger("件数") || 10,
+        password: getPassword(interaction),
       };
     case "認証":
       return {
