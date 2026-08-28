@@ -16,7 +16,7 @@ import { startMonitor } from "./monitor.js";
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
   console.error(
-    "DISCORD_TOKEN が未設定です。Railway の Variables に DISCORD_TOKEN を設定してください。"
+    "DISCORD_TOKEN が未設定です。ホスティングの環境変数に DISCORD_TOKEN を設定してください。"
   );
   process.exit(1);
 }
