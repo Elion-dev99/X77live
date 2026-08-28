@@ -96,7 +96,13 @@ export function buildDailyReportCsv(report) {
   return `${lines.join("\n")}\n`;
 }
 
-function updateReportsIndex(report, jsonPath, csvPath, reportsDir = REPORTS_DIR) {
+function updateReportsIndex(
+  report,
+  jsonPath,
+  csvPath,
+  reportsDir = REPORTS_DIR,
+  options = {}
+) {
   const indexPath = path.join(reportsDir, "index.json");
   /** @type {Array<object>} */
   let index = [];
@@ -118,6 +124,8 @@ function updateReportsIndex(report, jsonPath, csvPath, reportsDir = REPORTS_DIR)
     totalOnlineMinutes: report.totalOnlineMinutes,
     jsonFile: path.basename(jsonPath),
     csvFile: path.basename(csvPath),
+    interim: Boolean(report.interim),
+    kind: options.kind || (report.interim ? "interim" : "final"),
   };
 
   const existing = index.findIndex((item) => item.sessionKey === report.sessionKey);
@@ -138,17 +146,25 @@ export function saveDailyReportFiles(
   config,
   stats,
   generatedAt = new Date(),
-  reportsDir = REPORTS_DIR
+  reportsDir = REPORTS_DIR,
+  options = {}
 ) {
   ensureReportsDir(reportsDir);
 
   const report = buildDailyReportDocument(config, stats, generatedAt);
+  if (options.interim) {
+    report.interim = true;
+    report.note =
+      options.kind === "backup"
+        ? "営業途中の自動バックアップです。確定版は営業終了後 01:00 に上書き保存されます。"
+        : "営業途中の暫定レポートです。確定版は営業終了後 01:00 に data/reports/ へ保存されます。";
+  }
   const jsonPath = path.join(reportsDir, `${report.sessionKey}.json`);
   const csvPath = path.join(reportsDir, `${report.sessionKey}.csv`);
 
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2), "utf8");
   fs.writeFileSync(csvPath, buildDailyReportCsv(report), "utf8");
-  updateReportsIndex(report, jsonPath, csvPath, reportsDir);
+  updateReportsIndex(report, jsonPath, csvPath, reportsDir, options);
 
   console.log(
     `[daily-report] ファイル保存: ${path.basename(jsonPath)}, ${path.basename(csvPath)}`

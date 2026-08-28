@@ -53,6 +53,15 @@ export function defaultConfig() {
     history: [],
     dailyOnlineStats: null,
     lastDailySummarySessionKey: null,
+    lastReportBackupAt: null,
+    lastReportBackupSessionKey: null,
+    scrapeHealth: {
+      consecutiveFailures: 0,
+      lastFailureAt: null,
+      lastError: null,
+      alertSent: false,
+      lastSuccessAt: null,
+    },
     settings: {
       showWaitingList: true,
       showInCallList: true,
@@ -69,6 +78,11 @@ export function defaultConfig() {
       businessHoursOpen: process.env.BUSINESS_HOURS_OPEN?.trim() || "13:00",
       businessHoursClose: process.env.BUSINESS_HOURS_CLOSE?.trim() || "01:00",
       dailySummaryAt: process.env.DAILY_SUMMARY_AT?.trim() || "01:00",
+      scrapeAlertEnabled: process.env.SCRAPE_ALERT_ENABLED !== "false",
+      scrapeAlertThreshold: Number(process.env.SCRAPE_ALERT_THRESHOLD) || 3,
+      reportBackupEnabled: process.env.REPORT_BACKUP_ENABLED !== "false",
+      reportBackupIntervalHours:
+        Number(process.env.REPORT_BACKUP_INTERVAL_HOURS) || 3,
       statusChangeChannelId: null,
       maxHistoryEntries: 200,
       sortBy: "name",
@@ -109,6 +123,14 @@ export function loadConfig() {
       history: Array.isArray(raw.history) ? raw.history : [],
       dailyOnlineStats: raw.dailyOnlineStats || null,
       lastDailySummarySessionKey: raw.lastDailySummarySessionKey || null,
+      lastReportBackupAt: raw.lastReportBackupAt || null,
+      lastReportBackupSessionKey: raw.lastReportBackupSessionKey || null,
+      scrapeHealth: {
+        ...defaults.scrapeHealth,
+        ...(raw.scrapeHealth && typeof raw.scrapeHealth === "object"
+          ? raw.scrapeHealth
+          : {}),
+      },
       adminRoleIds: Array.isArray(raw.adminRoleIds)
         ? raw.adminRoleIds
         : defaults.adminRoleIds,

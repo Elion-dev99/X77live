@@ -15,6 +15,7 @@ import { startNotifier, restartNotifier } from "./notifier.js";
 import { startMonitor } from "./monitor.js";
 import { scheduleProcessRestart } from "./restart.js";
 import { startDailySummaryScheduler } from "./daily-stats.js";
+import { startReportBackupScheduler } from "./report-backup.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
@@ -84,6 +85,7 @@ client.once(Events.ClientReady, async (c) => {
 
     startMonitor(client, getConfig, persistConfig);
     startDailySummaryScheduler(client, getConfig, persistConfig);
+    startReportBackupScheduler(client, getConfig, persistConfig);
 
     if (config.notifyEnabled) {
       startNotifier(client, getConfig, persistConfig, buildNotificationEmbed);
