@@ -51,10 +51,20 @@ export function ensureAuthConfig(config) {
 export function initPasswordFromEnv(config) {
   ensureAuthConfig(config);
   const envPassword = process.env.ADMIN_PASSWORD?.trim();
-  if (envPassword && !config.auth.passwordHash) {
+  if (!envPassword) return;
+
+  const forceReset =
+    process.env.ADMIN_PASSWORD_RESET === "true" ||
+    process.env.ADMIN_PASSWORD_RESET === "1";
+
+  if (!config.auth.passwordHash || forceReset) {
     const record = createPasswordRecord(envPassword);
     config.auth.passwordSalt = record.passwordSalt;
     config.auth.passwordHash = record.passwordHash;
+    if (forceReset) {
+      config.auth.sessions = {};
+      console.log("[auth] ADMIN_PASSWORD を環境変数から再設定しました");
+    }
   }
 }
 

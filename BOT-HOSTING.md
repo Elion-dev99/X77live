@@ -30,7 +30,8 @@
 | `DISCORD_GUILD_ID` | 推奨 | サーバー ID |
 | `NOTIFY_CHANNEL_ID` | 推奨 | 通知先チャンネル |
 | `SHOP_ID` | 任意 | 大阪店 = `4` |
-| `ADMIN_PASSWORD` | ✅ | カスタマイズ用パスワード（Secret） |
+| `ADMIN_PASSWORD` | ✅ | 管理者コマンド用パスワード（Secret） |
+| `ADMIN_PASSWORD_RESET` | 任意 | `true` で再起動時に `ADMIN_PASSWORD` で上書き（1回だけ使う） |
 | `DATA_DIR` | 推奨 | `data` |
 
 ## 4. 起動
