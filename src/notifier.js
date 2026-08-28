@@ -1,5 +1,6 @@
 import { isInQuietHours } from "./config.js";
 import { getOnlineCount, buildNewBoyMessage } from "./format.js";
+import { sendAdminDirectMessage } from "./admin-notify.js";
 
 let intervalHandle = null;
 let currentClient = null;
@@ -140,62 +141,84 @@ function getAlertChannelId(config) {
 export async function sendScrapeFailureAlert(client, config, health) {
   if (config.settings?.scrapeAlertEnabled === false) return;
 
-  const channelId = getAlertChannelId(config);
-  if (!channelId) return;
+  const threshold = config.settings?.scrapeAlertThreshold || 3;
+  const pollMinutes = config.pollIntervalMinutes || 2;
+  const lines = [
+    "⚠️ **x77.jp 取得失敗アラート**",
+    "",
+    `x77.jp からのデータ取得が **${health.consecutiveFailures} 回** 連続で失敗しました（閾値: ${threshold} 回）。`,
+    `最後のエラー: \`${health.lastError || "不明"}\``,
+    "",
+    `監視間隔は ${pollMinutes} 分です。サイト障害やネットワーク問題の可能性があります。`,
+    "復旧すると自動で通知します。",
+  ];
 
-  try {
-    const channel = await client.channels.fetch(channelId);
-    if (!channel?.isTextBased()) return;
-
-    const threshold = config.settings?.scrapeAlertThreshold || 3;
-    const pollMinutes = config.pollIntervalMinutes || 2;
-    const lines = [
-      "⚠️ **x77.jp 取得失敗アラート**",
-      "",
-      `x77.jp からのデータ取得が **${health.consecutiveFailures} 回** 連続で失敗しました（閾値: ${threshold} 回）。`,
-      `最後のエラー: \`${health.lastError || "不明"}\``,
-      "",
-      `監視間隔は ${pollMinutes} 分です。サイト障害やネットワーク問題の可能性があります。`,
-      "復旧すると自動で通知します。",
-    ];
-
-    await channel.send({
-      content: lines.join("\n"),
-      allowedMentions: { parse: [] },
-    });
-    console.log(
-      `[notifier] 取得失敗アラート送信 (${health.consecutiveFailures} 回連続)`
-    );
-  } catch (err) {
-    console.error("[notifier] 取得失敗アラート送信エラー:", err.message);
+  const sent = await sendAdminDirectMessage(client, config, lines.join("\n"));
+  if (!sent) {
+    const channelId = getAlertChannelId(config);
+    if (!channelId) return;
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel?.isTextBased()) return;
+      await channel.send({
+        content: lines.join("\n"),
+        allowedMentions: { parse: [] },
+      });
+    } catch (err) {
+      console.error("[notifier] 取得失敗アラート送信エラー:", err.message);
+      return;
+    }
   }
+
+  console.log(
+    `[notifier] 取得失敗アラート送信 (${health.consecutiveFailures} 回連続)`
+  );
 }
 
 export async function sendScrapeRecoveryNotification(client, config, previousFailures) {
   if (config.settings?.scrapeAlertEnabled === false) return;
   if (!previousFailures) return;
 
-  const channelId = getAlertChannelId(config);
-  if (!channelId) return;
+  const lines = [
+    "✅ **x77.jp 取得が復旧しました**",
+    "",
+    `${previousFailures} 回連続失敗の後、正常にデータを取得できました。`,
+  ];
 
-  try {
-    const channel = await client.channels.fetch(channelId);
-    if (!channel?.isTextBased()) return;
-
-    const lines = [
-      "✅ **x77.jp 取得が復旧しました**",
-      "",
-      `${previousFailures} 回連続失敗の後、正常にデータを取得できました。`,
-    ];
-
-    await channel.send({
-      content: lines.join("\n"),
-      allowedMentions: { parse: [] },
-    });
-    console.log("[notifier] 取得復旧通知送信");
-  } catch (err) {
-    console.error("[notifier] 取得復旧通知送信エラー:", err.message);
+  const sent = await sendAdminDirectMessage(client, config, lines.join("\n"));
+  if (!sent) {
+    const channelId = getAlertChannelId(config);
+    if (!channelId) return;
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel?.isTextBased()) return;
+      await channel.send({
+        content: lines.join("\n"),
+        allowedMentions: { parse: [] },
+      });
+    } catch (err) {
+      console.error("[notifier] 取得復旧通知送信エラー:", err.message);
+      return;
+    }
   }
+
+  console.log("[notifier] 取得復旧通知送信");
+}
+
+export async function sendReportBackupNotification(client, config, saved) {
+  if (config.settings?.reportBackupNotifyAdmin === false) return;
+
+  const report = saved.report;
+  const lines = [
+    "💾 **営業中レポート自動バックアップ**",
+    "",
+    `営業日 **${report.sessionKey}** の途中集計を \`data/reports/\` に保存しました。`,
+    `オンライン: **${report.onlineCount}名** / 合計 **${report.totalOnlineDuration}**`,
+    "",
+    "Bot 再起動後も SFTP または `/レポート取得` で回収できます。",
+  ];
+
+  await sendAdminDirectMessage(client, config, lines.join("\n"));
 }
 
 export async function sendNewBoyNotification(client, config, boy) {
