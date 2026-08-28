@@ -14,11 +14,48 @@ import {
   maybeSaveReportBackup,
 } from "../src/report-backup.js";
 import { saveDailyReportFiles } from "../src/daily-report-files.js";
-import { STATUS } from "../src/scraper.js";
+import { getAdminUserIds, sendAdminDirectMessage } from "../src/admin-notify.js";
+import { sendScrapeFailureAlert } from "../src/notifier.js";
 
 function jstDate(y, m, d, h, min = 0) {
   return new Date(Date.UTC(y, m - 1, d, h - 9, min));
 }
+
+function mockAdminClient(sent) {
+  return {
+    users: {
+      fetch: async (id) => ({
+        id,
+        tag: "admin#0001",
+        send: async (payload) => sent.push({ target: "dm", id, ...payload }),
+      }),
+    },
+    channels: {
+      fetch: async () => ({
+        isTextBased: () => true,
+        send: async (payload) => sent.push({ target: "channel", ...payload }),
+      }),
+    },
+  };
+}
+
+describe("admin-notify", () => {
+  it("getAdminUserIds reads comma-separated env-style ids", () => {
+    const config = defaultConfig();
+    config.adminUserIds = ["111", "222"];
+    assert.deepEqual(getAdminUserIds(config), ["111", "222"]);
+  });
+
+  it("sendAdminDirectMessage sends to configured admin", async () => {
+    const config = defaultConfig();
+    config.adminUserId = "999";
+    const sent = [];
+    const ok = await sendAdminDirectMessage(mockAdminClient(sent), config, "hello");
+    assert.equal(ok, true);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].target, "dm");
+  });
+});
 
 describe("scrape-health", () => {
   it("ensureScrapeHealth initializes defaults", () => {
@@ -31,16 +68,10 @@ describe("scrape-health", () => {
 
   it("handleScrapeFailure increments counter and sends alert at threshold", async () => {
     const config = defaultConfig();
+    config.adminUserId = "999";
     config.settings.scrapeAlertThreshold = 3;
     const sent = [];
-    const client = {
-      channels: {
-        fetch: async () => ({
-          isTextBased: () => true,
-          send: async (payload) => sent.push(payload),
-        }),
-      },
-    };
+    const client = mockAdminClient(sent);
     let persisted = 0;
     const persist = () => {
       persisted += 1;
@@ -55,12 +86,14 @@ describe("scrape-health", () => {
     assert.equal(config.scrapeHealth.consecutiveFailures, 3);
     assert.equal(config.scrapeHealth.alertSent, true);
     assert.equal(sent.length, 1);
+    assert.equal(sent[0].target, "dm");
     assert.match(sent[0].content, /取得失敗アラート/);
     assert.ok(persisted >= 3);
   });
 
   it("handleScrapeSuccess sends recovery after failures and resets health", async () => {
     const config = defaultConfig();
+    config.adminUserId = "999";
     config.scrapeHealth = {
       consecutiveFailures: 4,
       lastFailureAt: new Date().toISOString(),
@@ -69,14 +102,7 @@ describe("scrape-health", () => {
       lastSuccessAt: null,
     };
     const sent = [];
-    const client = {
-      channels: {
-        fetch: async () => ({
-          isTextBased: () => true,
-          send: async (payload) => sent.push(payload),
-        }),
-      },
-    };
+    const client = mockAdminClient(sent);
     let persisted = 0;
 
     await handleScrapeSuccess(config, client, () => {
@@ -86,8 +112,26 @@ describe("scrape-health", () => {
     assert.equal(config.scrapeHealth.consecutiveFailures, 0);
     assert.equal(config.scrapeHealth.alertSent, false);
     assert.equal(sent.length, 1);
+    assert.equal(sent[0].target, "dm");
     assert.match(sent[0].content, /復旧/);
     assert.equal(persisted, 1);
+  });
+
+  it("sendScrapeFailureAlert falls back to channel when admin id missing", async () => {
+    const config = defaultConfig();
+    config.adminUserId = null;
+    config.adminUserIds = [];
+    config.notifyChannelId = "1542848670221860884";
+    const sent = [];
+    const client = mockAdminClient(sent);
+
+    await sendScrapeFailureAlert(client, config, {
+      consecutiveFailures: 3,
+      lastError: "timeout",
+    });
+
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].target, "channel");
   });
 });
 

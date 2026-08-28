@@ -33,6 +33,29 @@
 | `ADMIN_PASSWORD` | ✅ | 管理者コマンド用パスワード（Secret） |
 | `ADMIN_PASSWORD_RESET` | 任意 | `true` で再起動時に `ADMIN_PASSWORD` で上書き（1回だけ使う） |
 | `DATA_DIR` | 推奨 | `data` |
+| `ADMIN_USER_ID` | ✅ | **管理者の Discord ユーザー ID**（取得失敗アラート等を DM 送信） |
+| `POLL_INTERVAL_MINUTES` | 任意 | x77.jp 監視間隔（分）。デフォルト `2` |
+| `NOTIFY_INTERVAL_MINUTES` | 任意 | 定期通知間隔（分）。デフォルト `10` |
+| `NOTIFY_ENABLED` | 任意 | 定期通知 ON/OFF。デフォルト `true` |
+| `STORE_NAME` | 任意 | 店舗名。デフォルト `大阪店` |
+| `AUTH_SESSION_HOURS` | 任意 | 認証セッション有効時間。デフォルト `8` |
+| `BUSINESS_HOURS_OPEN` | 任意 | 営業開始。デフォルト `13:00` |
+| `BUSINESS_HOURS_CLOSE` | 任意 | 営業終了。デフォルト `01:00` |
+| `DAILY_SUMMARY_AT` | 任意 | 日次サマリー送信時刻。デフォルト `01:00` |
+| `SCRAPE_ALERT_THRESHOLD` | 任意 | 連続取得失敗の閾値。デフォルト `3` |
+| `SCRAPE_ALERT_ENABLED` | 任意 | 取得失敗アラート。デフォルト `true` |
+| `REPORT_BACKUP_INTERVAL_HOURS` | 任意 | 営業中バックアップ間隔（時間）。デフォルト `3` |
+| `REPORT_BACKUP_ENABLED` | 任意 | 自動バックアップ。デフォルト `true` |
+| `REPORT_BACKUP_NOTIFY_ADMIN` | 任意 | バックアップ完了を管理者 DM。デフォルト `true` |
+
+### 管理者 DM（ADMIN_USER_ID）の取得
+
+1. Discord 設定 → **詳細設定** → **開発者モード** を ON
+2. 自分のアイコンを右クリック → **ユーザーIDをコピー**
+3. Bot-Hosting の `ADMIN_USER_ID` に貼り付け
+
+サーバー管理用アラート（x77.jp 取得失敗・復旧、レポート自動バックアップ）は **#x77live ではなくあなた個人の DM** に届きます。  
+初回 DM 前に、Bot がいるサーバーで Bot と一度やり取り（例: `/ヘルプ`）しておくと確実です。
 
 ## 4. 起動
 

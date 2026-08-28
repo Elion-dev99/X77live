@@ -34,6 +34,11 @@ export function defaultConfig() {
     storeName: process.env.STORE_NAME?.trim() || "大阪店",
     shopId: process.env.SHOP_ID?.trim() || "4",
     notifyChannelId: process.env.NOTIFY_CHANNEL_ID?.trim() || null,
+    adminUserId: process.env.ADMIN_USER_ID?.trim() || null,
+    adminUserIds: (process.env.ADMIN_USER_ID || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     notifyIntervalMinutes: Number(process.env.NOTIFY_INTERVAL_MINUTES) || 10,
     pollIntervalMinutes: Number(process.env.POLL_INTERVAL_MINUTES) || 2,
     notifyEnabled: process.env.NOTIFY_ENABLED !== "false",
@@ -83,6 +88,7 @@ export function defaultConfig() {
       reportBackupEnabled: process.env.REPORT_BACKUP_ENABLED !== "false",
       reportBackupIntervalHours:
         Number(process.env.REPORT_BACKUP_INTERVAL_HOURS) || 3,
+      reportBackupNotifyAdmin: process.env.REPORT_BACKUP_NOTIFY_ADMIN !== "false",
       statusChangeChannelId: null,
       maxHistoryEntries: 200,
       sortBy: "name",
@@ -113,6 +119,10 @@ export function loadConfig() {
     const config = {
       ...defaults,
       ...raw,
+      adminUserId: raw.adminUserId || defaults.adminUserId,
+      adminUserIds: Array.isArray(raw.adminUserIds)
+        ? raw.adminUserIds
+        : defaults.adminUserIds,
       settings: { ...defaults.settings, ...(raw.settings || {}) },
       auth: { ...defaults.auth, ...(raw.auth || {}) },
       boys: raw.boys && typeof raw.boys === "object" ? raw.boys : {},
