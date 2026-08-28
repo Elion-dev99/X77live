@@ -2,6 +2,7 @@ import { isWithinBusinessHours, getBusinessSessionKey } from "./business-hours.j
 import { getCurrentBusinessDayStats } from "./daily-stats.js";
 import { saveDailyReportFiles } from "./daily-report-files.js";
 import { addHistory } from "./store.js";
+import { sendReportBackupNotification } from "./notifier.js";
 import path from "node:path";
 
 let backupHandle = null;
@@ -36,7 +37,7 @@ export function shouldRunReportBackup(config, now = new Date()) {
   return now.getTime() - lastBackupAt >= intervalMs;
 }
 
-export function maybeSaveReportBackup(config, now = new Date(), reportsDir) {
+export function maybeSaveReportBackup(config, now = new Date(), reportsDir, client = null) {
   if (!shouldRunReportBackup(config, now)) {
     return null;
   }
@@ -67,6 +68,12 @@ export function maybeSaveReportBackup(config, now = new Date(), reportsDir) {
     `[report-backup] 営業中スナップショット保存: ${result.stats.sessionKey} (${Object.keys(result.stats.boys || {}).length}名)`
   );
 
+  if (client) {
+    sendReportBackupNotification(client, config, saved).catch((err) => {
+      console.error("[report-backup] 管理DM通知エラー:", err.message);
+    });
+  }
+
   return saved;
 }
 
@@ -74,12 +81,12 @@ export function startReportBackupScheduler(client, getConfig, persistConfig) {
   stopReportBackupScheduler();
 
   backupHandle = setInterval(() => {
-    tickReportBackup(getConfig, persistConfig).catch((err) => {
+    tickReportBackup(getConfig, persistConfig, client).catch((err) => {
       console.error("[report-backup] バックアップチェックエラー:", err.message);
     });
   }, 60 * 1000);
 
-  tickReportBackup(getConfig, persistConfig).catch((err) => {
+  tickReportBackup(getConfig, persistConfig, client).catch((err) => {
     console.error("[report-backup] 初回チェックエラー:", err.message);
   });
 
@@ -95,9 +102,9 @@ export function stopReportBackupScheduler() {
   }
 }
 
-async function tickReportBackup(getConfig, persistConfig) {
+async function tickReportBackup(getConfig, persistConfig, client) {
   const config = getConfig();
-  const saved = maybeSaveReportBackup(config);
+  const saved = maybeSaveReportBackup(config, new Date(), undefined, client);
   if (saved) {
     persistConfig();
   }

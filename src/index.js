@@ -82,6 +82,10 @@ client.once(Events.ClientReady, async (c) => {
     console.log(
       `[boot] 通知チャンネル: ${config.notifyChannelId || "未設定"}`
     );
+    const adminIds = config.adminUserIds?.length
+      ? config.adminUserIds.join(", ")
+      : config.adminUserId || "未設定";
+    console.log(`[boot] 管理者DM: ${adminIds}`);
 
     startMonitor(client, getConfig, persistConfig);
     startDailySummaryScheduler(client, getConfig, persistConfig);

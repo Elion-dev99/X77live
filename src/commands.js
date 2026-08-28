@@ -485,7 +485,8 @@ export async function handleCommand(interaction, parsed) {
           `- **毎日 01:00** に本日のオンライン稼働サマリーを投稿（営業 13:00〜翌01:00）`,
           `- サマリーは \`data/reports/営業日.json\` と \`.csv\` にも保存`,
           `- 営業中は **${config.settings.reportBackupIntervalHours || 3}時間** ごとにレポートを自動バックアップ`,
-          `- x77.jp 取得が **${config.settings.scrapeAlertThreshold || 3}回** 連続失敗すると Discord に警告（復旧時も通知）`,
+          `- x77.jp 取得が **${config.settings.scrapeAlertThreshold || 3}回** 連続失敗すると **管理者DM** に警告（復旧時も通知）`,
+          `- 営業中バックアップ完了も **管理者DM** に通知（\`ADMIN_USER_ID\`）`,
         ].join("\n"),
       };
 
