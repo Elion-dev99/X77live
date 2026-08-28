@@ -131,6 +131,11 @@ export function buildSlashCommands() {
       ),
 
     new SlashCommandBuilder()
+      .setName("再起動")
+      .setDescription("Bot サーバーを再起動（Bot-Hosting が自動で起動し直します）")
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
       .setName("ヘルプ")
       .setDescription("コマンド一覧と使い方"),
   ].map((cmd) => cmd.toJSON());
@@ -200,6 +205,11 @@ export function parseSlashInteraction(interaction) {
         command: "change_password",
         currentPassword: interaction.options.getString("現在のパスワード"),
         newPassword: interaction.options.getString("新しいパスワード"),
+      };
+    case "再起動":
+      return {
+        command: "restart_server",
+        password: getPassword(interaction),
       };
     case "ヘルプ":
       return { command: "help" };

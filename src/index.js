@@ -12,6 +12,7 @@ import { buildNotificationEmbed } from "./format.js";
 import { startHealthServer } from "./health.js";
 import { startNotifier, restartNotifier } from "./notifier.js";
 import { startMonitor } from "./monitor.js";
+import { scheduleProcessRestart } from "./restart.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
@@ -130,6 +131,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
       };
       if (result.embed) opts.embeds = [result.embed];
       await result.interaction.editReply(opts);
+      return;
+    }
+
+    if (result.type === "restart") {
+      await interaction.reply({
+        allowedMentions: { parse: [] },
+        content: result.content,
+        ephemeral: true,
+      });
+      scheduleProcessRestart(client, result.reason);
       return;
     }
 
