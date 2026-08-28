@@ -15,7 +15,8 @@ import {
 } from "../src/scraper.js";
 
 const FIXTURE_LIVE = path.join("test", "fixtures", "live-online.html");
-const FIXTURE_LIVER_LIST = path.join("test", "fixtures", "twoshot-liverlist.html");
+const FIXTURE_LIVER_LIST = path.join("test", "fixtures", "twoshot-liverlist-osaka.html");
+const FIXTURE_LIVER_LIST_KANSAI = path.join("test", "fixtures", "twoshot-liverlist.html");
 const FIXTURE_ROSTER = path.join("test", "fixtures", "osaka-roster.html");
 
 describe("scraper", () => {
@@ -41,22 +42,23 @@ describe("scraper", () => {
     assert.ok(statuses.size > 10);
     assert.ok([...statuses.values()].some((b) => b.status === STATUS.WAITING));
     assert.ok([...statuses.values()].some((b) => b.status === STATUS.OFFLINE));
-    assert.equal(statuses.get("13187")?.status, STATUS.OFFLINE);
-    assert.equal(statuses.get("12281")?.status, STATUS.WAITING);
+    assert.equal(statuses.get("10235")?.name, "つむぎ");
   });
 
-  it("parseLiverListTotal reads total count", () => {
+  it("parseLiverListTotal reads total count for Osaka shop", () => {
     if (!fs.existsSync(FIXTURE_LIVER_LIST)) {
       console.log("skip: fixture not found");
       return;
     }
     const html = fs.readFileSync(FIXTURE_LIVER_LIST, "utf8");
-    assert.equal(parseLiverListTotal(html), 133);
+    assert.equal(parseLiverListTotal(html), 43);
   });
 
-  it("buildLiverListUrl includes pagination params", () => {
+  it("buildLiverListUrl includes shop and pagination params", () => {
+    assert.ok(buildLiverListUrl(1).includes("search_shop_id=4"));
     assert.ok(buildLiverListUrl(1).includes("search_page_max=50"));
     assert.ok(buildLiverListUrl(2).includes("search_pageno=2"));
+    assert.ok(buildLiverListUrl(1, "9").includes("search_shop_id=9"));
   });
 
   it("parseRosterPage extracts boy ids", () => {

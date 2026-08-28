@@ -76,6 +76,13 @@ function applyScrapeResult(config, data) {
     };
   }
 
+  const rosterIds = new Set(data.roster.keys());
+  for (const boyId of Object.keys(config.boyStatuses)) {
+    if (!rosterIds.has(boyId)) {
+      delete config.boyStatuses[boyId];
+    }
+  }
+
   config.lastScrapeAt = data.scrapedAt;
   config.lastSummary = {
     ...data.summary,
