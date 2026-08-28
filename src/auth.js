@@ -13,6 +13,7 @@ export const ADMIN_COMMANDS = new Set([
   "restart_server",
   "report_list",
   "report_download",
+  "report_interim",
 ]);
 
 /** @deprecated ADMIN_COMMANDS を使用してください */

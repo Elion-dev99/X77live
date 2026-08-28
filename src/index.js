@@ -133,6 +133,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         content: result.content,
       };
       if (result.embed) opts.embeds = [result.embed];
+      if (result.files?.length) {
+        opts.files = result.files.map((file) =>
+          file.path
+            ? new AttachmentBuilder(file.path, { name: file.name })
+            : new AttachmentBuilder(Buffer.from(file.content, "utf8"), {
+                name: file.name,
+              })
+        );
+      }
       await result.interaction.editReply(opts);
       return;
     }
@@ -148,12 +157,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (result.type === "files") {
-      const attachments = (result.files || []).map(
-        (file) => new AttachmentBuilder(file.path, { name: file.name })
+      const attachments = (result.files || []).map((file) =>
+        file.path
+          ? new AttachmentBuilder(file.path, { name: file.name })
+          : new AttachmentBuilder(Buffer.from(file.content, "utf8"), {
+              name: file.name,
+            })
       );
       await interaction.reply({
         allowedMentions: { parse: [] },
         content: result.content,
+        embeds: result.embed ? [result.embed] : [],
         files: attachments,
         ephemeral: result.ephemeral !== false,
       });

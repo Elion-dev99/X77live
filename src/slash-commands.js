@@ -171,6 +171,23 @@ export function buildSlashCommands() {
       .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
+      .setName("レポート途中")
+      .setDescription("営業日の現時点までの暫定レポートを表示")
+      .addStringOption((opt) =>
+        opt
+          .setName("形式")
+          .setDescription("ファイル添付（省略時は Embed のみ）")
+          .setRequired(false)
+          .addChoices(
+            { name: "表示のみ", value: "view" },
+            { name: "JSON", value: "json" },
+            { name: "CSV", value: "csv" },
+            { name: "両方", value: "both" }
+          )
+      )
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
       .setName("ヘルプ")
       .setDescription("コマンド一覧と使い方"),
   ].map((cmd) => cmd.toJSON());
@@ -257,6 +274,12 @@ export function parseSlashInteraction(interaction) {
         command: "report_download",
         sessionKey: interaction.options.getString("営業日"),
         format: interaction.options.getString("形式") || "both",
+        password: getPassword(interaction),
+      };
+    case "レポート途中":
+      return {
+        command: "report_interim",
+        format: interaction.options.getString("形式") || "view",
         password: getPassword(interaction),
       };
     case "ヘルプ":

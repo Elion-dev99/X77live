@@ -225,3 +225,32 @@ export function loadReportDocument(sessionKey, reportsDir = REPORTS_DIR) {
     return null;
   }
 }
+
+/**
+ * 営業途中の暫定レポート（ファイル保存せずメモリ上で生成）
+ * @param {"json"|"csv"|"both"} format
+ */
+export function buildInterimReportFiles(config, stats, format = "both", generatedAt = new Date()) {
+  const report = buildDailyReportDocument(config, stats, generatedAt);
+  report.interim = true;
+  report.note =
+    "営業途中の暫定レポートです。確定版は営業終了後 01:00 に data/reports/ へ保存されます。";
+
+  /** @type {Array<{ name: string, content: string }>} */
+  const files = [];
+
+  if (format === "json" || format === "both") {
+    files.push({
+      name: `${stats.sessionKey}-interim.json`,
+      content: JSON.stringify(report, null, 2),
+    });
+  }
+  if (format === "csv" || format === "both") {
+    files.push({
+      name: `${stats.sessionKey}-interim.csv`,
+      content: buildDailyReportCsv(report),
+    });
+  }
+
+  return { report, files };
+}

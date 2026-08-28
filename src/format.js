@@ -191,8 +191,9 @@ export function buildNewBoyMessage(boy, storeName) {
 /**
  * @param {object} config
  * @param {{ sessionKey: string, boys: Record<string, { name: string, onlineMinutes: number }> }} stats
+ * @param {{ interim?: boolean, asOf?: Date }} [options]
  */
-export function buildDailySummaryEmbed(config, stats) {
+export function buildDailySummaryEmbed(config, stats, options = {}) {
   const settings = config.settings || {};
   const period = formatSessionPeriod(stats.sessionKey, settings);
   const entries = Object.entries(stats.boys || {})
@@ -207,24 +208,44 @@ export function buildDailySummaryEmbed(config, stats) {
         a.name.localeCompare(b.name, "ja")
     );
 
+  const title = options.interim
+    ? `📊 ${config.storeName} — 営業途中レポート（暫定）`
+    : `📊 ${config.storeName} — 本日のオンライン稼働サマリー`;
+
   const embed = new EmbedBuilder()
-    .setTitle(`📊 ${config.storeName} — 本日のオンライン稼働サマリー`)
+    .setTitle(title)
     .setColor(config.settings.embedColorSummary)
-    .setTimestamp(new Date());
+    .setTimestamp(options.asOf || new Date());
+
+  const asOfText = options.asOf
+    ? options.asOf.toLocaleString("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  const descParts = [`営業時間: ${period}`];
+  if (options.interim && asOfText) {
+    descParts.push(`⏱️ 集計時点: **${asOfText}**（確定版は 01:00）`);
+  }
 
   if (entries.length === 0) {
-    embed.setDescription(`営業時間: ${period}`);
+    embed.setDescription(descParts.join("\n"));
     embed.addFields({
       name: "稼働実績",
-      value: "_本営業日はオンライン稼働がありませんでした_",
+      value: options.interim
+        ? "_現時点でオンライン稼働の記録はありません_"
+        : "_本営業日はオンライン稼働がありませんでした_",
     });
     return embed;
   }
 
   const totalMinutes = entries.reduce((sum, e) => sum + e.onlineMinutes, 0);
-  embed.setDescription(
-    [`営業時間: ${period}`, `オンライン稼働: **${entries.length}** 名`].join("\n")
-  );
+  descParts.push(`オンライン稼働: **${entries.length}** 名`);
+  embed.setDescription(descParts.join("\n"));
 
   const lines = entries.map(
     (e, i) =>
