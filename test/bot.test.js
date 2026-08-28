@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defaultConfig, addHistory } from "../src/store.js";
 import { applySetting, isInQuietHours } from "../src/config.js";
-import { buildStatusEmbed, buildBoyStatusChangeMessage } from "../src/format.js";
+import { buildStatusEmbed, buildNotificationEmbed, buildBoyStatusChangeMessage, getOnlineCount } from "../src/format.js";
 import {
   parseLivePage,
   parseRosterPage,
@@ -135,5 +135,22 @@ describe("format", () => {
     });
     assert.ok(msg.includes("太郎"));
     assert.ok(msg.includes("待機中"));
+  });
+
+  it("buildNotificationEmbed excludes offline boys", () => {
+    const config = defaultConfig();
+    config.boyStatuses = {
+      "1": { name: "太郎", status: STATUS.WAITING, updatedAt: new Date().toISOString() },
+      "2": { name: "花子", status: STATUS.IN_CALL, updatedAt: new Date().toISOString() },
+      "3": { name: "次郎", status: STATUS.OFFLINE, updatedAt: new Date().toISOString() },
+    };
+    config.lastSummary = { total: 3, waiting: 1, inCall: 1, offline: 1 };
+
+    const embed = buildNotificationEmbed(config);
+    const fields = embed.data.fields || [];
+    const text = JSON.stringify(embed.data);
+    assert.ok(!text.includes("次郎"));
+    assert.ok(!fields.some((f) => f.name.includes("オフライン")));
+    assert.equal(getOnlineCount(config), 2);
   });
 });

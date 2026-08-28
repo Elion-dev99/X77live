@@ -6,6 +6,7 @@ import {
 } from "./store.js";
 import {
   buildStatusEmbed,
+  buildNotificationEmbed,
   buildMemberListEmbed,
   buildSettingsEmbed,
   buildHistoryEmbed,
@@ -288,7 +289,7 @@ export async function handleCommand(interaction, parsed) {
             clientRef,
             getConfig,
             persistConfig,
-            buildStatusEmbed
+            buildNotificationEmbed
           );
         }
       }
@@ -323,7 +324,7 @@ export async function handleCommand(interaction, parsed) {
       await runScrape(getConfig, persistConfig, clientRef);
 
       if (clientRef) {
-        await sendPeriodicNotification(getConfig, persistConfig, buildStatusEmbed);
+        await sendPeriodicNotification(getConfig, persistConfig, buildNotificationEmbed);
       }
 
       return {

@@ -8,7 +8,7 @@ import {
 } from "discord.js";
 import { buildSlashCommands, parseSlashInteraction } from "./slash-commands.js";
 import { initCommands, handleCommand, getConfig, persistConfig } from "./commands.js";
-import { buildStatusEmbed } from "./format.js";
+import { buildNotificationEmbed } from "./format.js";
 import { startHealthServer } from "./health.js";
 import { startNotifier, restartNotifier } from "./notifier.js";
 import { startMonitor } from "./monitor.js";
@@ -82,7 +82,7 @@ client.once(Events.ClientReady, async (c) => {
     startMonitor(client, getConfig, persistConfig);
 
     if (config.notifyEnabled) {
-      startNotifier(client, getConfig, persistConfig, buildStatusEmbed);
+      startNotifier(client, getConfig, persistConfig, buildNotificationEmbed);
     }
   } catch (err) {
     console.error("[warn] 起動後処理エラー（Bot本体は稼働中）:", err);

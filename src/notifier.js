@@ -1,4 +1,5 @@
 import { isInQuietHours } from "./config.js";
+import { getOnlineCount } from "./format.js";
 
 let intervalHandle = null;
 let currentClient = null;
@@ -56,6 +57,11 @@ export async function sendPeriodicNotification(
   }
   if (isInQuietHours(config)) {
     console.log("[notifier] 通知停止時間帯のためスキップ");
+    return;
+  }
+
+  if (getOnlineCount(config) === 0) {
+    console.log("[notifier] オンライン0名のため通知をスキップ");
     return;
   }
 

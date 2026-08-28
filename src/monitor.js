@@ -1,7 +1,7 @@
 import { scrapeOsakaStatuses, STATUS } from "./scraper.js";
 import { addHistory, saveConfig } from "./store.js";
 import { sendStatusChangeNotification } from "./notifier.js";
-import { buildBoyStatusChangeMessage } from "./format.js";
+import { buildBoyStatusChangeMessage, isOnlineStatus } from "./format.js";
 
 /** @type {ReturnType<typeof setInterval>|null} */
 let pollHandle = null;
@@ -117,6 +117,7 @@ export async function runScrape(getConfig, persistConfig, client = null) {
 
   if (client && config.settings.pingOnStatusChange && changes.length > 0) {
     for (const change of changes) {
+      if (!isOnlineStatus(change.to)) continue;
       const msg = buildBoyStatusChangeMessage(change);
       await sendStatusChangeNotification(client, config, msg);
     }
