@@ -1,6 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import { getMonitoredBoys, getBoysByStatus } from "./store.js";
 import { STATUS } from "./scraper.js";
+import { formatDurationMinutes, formatSessionPeriod } from "./business-hours.js";
 
 function sortBoys(boys, sortBy) {
   const sorted = [...boys];
@@ -180,6 +181,85 @@ export function buildBoyStatusChangeMessage(change) {
   return `${icon[change.to] || "🔔"} **${change.name}**: ${change.from} → **${change.to}**`;
 }
 
+export function buildNewBoyMessage(boy, storeName) {
+  return [
+    "🆕 **新規ボーイを検出しました**",
+    `**${boy.name}** (ID: ${boy.boyId}) が${storeName}ロスターに追加されました`,
+  ].join("\n");
+}
+
+/**
+ * @param {object} config
+ * @param {{ sessionKey: string, boys: Record<string, { name: string, onlineMinutes: number }> }} stats
+ */
+export function buildDailySummaryEmbed(config, stats) {
+  const settings = config.settings || {};
+  const period = formatSessionPeriod(stats.sessionKey, settings);
+  const entries = Object.entries(stats.boys || {})
+    .map(([boyId, info]) => ({
+      boyId,
+      name: info.name,
+      onlineMinutes: info.onlineMinutes || 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.onlineMinutes - a.onlineMinutes ||
+        a.name.localeCompare(b.name, "ja")
+    );
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📊 ${config.storeName} — 本日のオンライン稼働サマリー`)
+    .setColor(config.settings.embedColorSummary)
+    .setTimestamp(new Date());
+
+  if (entries.length === 0) {
+    embed.setDescription(`営業時間: ${period}`);
+    embed.addFields({
+      name: "稼働実績",
+      value: "_本営業日はオンライン稼働がありませんでした_",
+    });
+    return embed;
+  }
+
+  const totalMinutes = entries.reduce((sum, e) => sum + e.onlineMinutes, 0);
+  embed.setDescription(
+    [`営業時間: ${period}`, `オンライン稼働: **${entries.length}** 名`].join("\n")
+  );
+
+  const lines = entries.map(
+    (e, i) =>
+      `${i + 1}. **${e.name}** — ${formatDurationMinutes(e.onlineMinutes)}`
+  );
+
+  let chunk = "";
+  let fieldIndex = 1;
+  for (const line of lines) {
+    const next = chunk ? `${chunk}\n${line}` : line;
+    if (next.length > 1000 && chunk) {
+      embed.addFields({
+        name: fieldIndex === 1 ? "稼働時間ランキング" : "　",
+        value: chunk,
+      });
+      fieldIndex++;
+      chunk = line;
+    } else {
+      chunk = next;
+    }
+  }
+  if (chunk) {
+    embed.addFields({
+      name: fieldIndex === 1 ? "稼働時間ランキング" : "　",
+      value: chunk.slice(0, 1024),
+    });
+  }
+
+  embed.setFooter({
+    text: `${config.settings.footerText} | 合計 ${formatDurationMinutes(totalMinutes)}`,
+  });
+
+  return embed;
+}
+
 export function buildMemberListEmbed(config) {
   const boys = sortBoys(getMonitoredBoys(config), "name");
   const embed = new EmbedBuilder()
@@ -300,6 +380,12 @@ export function buildHistoryEmbed(config, limit = 10) {
     }
     if (entry.type === "boy_include") {
       return `\`${time}\` ✅ **${entry.name}** 監視再開`;
+    }
+    if (entry.type === "boy_new") {
+      return `\`${time}\` 🆕 **${entry.name}** ロスター追加`;
+    }
+    if (entry.type === "daily_summary") {
+      return `\`${time}\` 📊 日次サマリー送信 (${entry.sessionKey})`;
     }
     return `\`${time}\` ${entry.type}`;
   });

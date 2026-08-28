@@ -1,5 +1,5 @@
 import { isInQuietHours } from "./config.js";
-import { getOnlineCount } from "./format.js";
+import { getOnlineCount, buildNewBoyMessage } from "./format.js";
 
 let intervalHandle = null;
 let currentClient = null;
@@ -130,5 +130,26 @@ export async function sendStatusChangeNotification(client, config, message) {
     });
   } catch (err) {
     console.error("[notifier] ステータス変更通知エラー:", err.message);
+  }
+}
+
+export async function sendNewBoyNotification(client, config, boy) {
+  if (config.settings.pingOnNewBoy === false) return;
+
+  const channelId =
+    config.settings.statusChangeChannelId || config.notifyChannelId;
+  if (!channelId) return;
+
+  try {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel?.isTextBased()) return;
+
+    await channel.send({
+      content: buildNewBoyMessage(boy, config.storeName),
+      allowedMentions: { parse: [] },
+    });
+    console.log(`[notifier] 新規ボーイ通知: ${boy.name} (${boy.boyId})`);
+  } catch (err) {
+    console.error("[notifier] 新規ボーイ通知エラー:", err.message);
   }
 }

@@ -51,6 +51,8 @@ export function defaultConfig() {
     boys: {},
     boyStatuses: {},
     history: [],
+    dailyOnlineStats: null,
+    lastDailySummarySessionKey: null,
     settings: {
       showWaitingList: true,
       showInCallList: true,
@@ -62,6 +64,11 @@ export function defaultConfig() {
       quietHoursStart: null,
       quietHoursEnd: null,
       pingOnStatusChange: true,
+      pingOnNewBoy: true,
+      dailySummaryEnabled: true,
+      businessHoursOpen: process.env.BUSINESS_HOURS_OPEN?.trim() || "13:00",
+      businessHoursClose: process.env.BUSINESS_HOURS_CLOSE?.trim() || "01:00",
+      dailySummaryAt: process.env.DAILY_SUMMARY_AT?.trim() || "01:00",
       statusChangeChannelId: null,
       maxHistoryEntries: 200,
       sortBy: "name",
@@ -100,6 +107,8 @@ export function loadConfig() {
           ? raw.boyStatuses
           : {},
       history: Array.isArray(raw.history) ? raw.history : [],
+      dailyOnlineStats: raw.dailyOnlineStats || null,
+      lastDailySummarySessionKey: raw.lastDailySummarySessionKey || null,
       adminRoleIds: Array.isArray(raw.adminRoleIds)
         ? raw.adminRoleIds
         : defaults.adminRoleIds,
