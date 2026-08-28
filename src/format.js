@@ -169,6 +169,11 @@ export function buildSettingsEmbed(config) {
       inline: true,
     },
     {
+      name: "ステータス変更通知",
+      value: config.settings.pingOnStatusChange ? "✅ 有効" : "❌ 無効",
+      inline: true,
+    },
+    {
       name: "表示項目",
       value: [
         config.settings.showWaitingList ? "待機中" : null,
