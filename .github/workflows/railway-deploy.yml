@@ -1,0 +1,21 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container: ghcr.io/railwayapp/cli:latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Railway
+        if: env.RAILWAY_TOKEN != ''
+        run: railway up --service=${{ secrets.RAILWAY_SERVICE_ID }} --ci
+      - name: Skip (no token)
+        if: env.RAILWAY_TOKEN == ''
+        run: echo "RAILWAY_TOKEN not set — deploy via Railway GitHub integration instead."
