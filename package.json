@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "sandbox": "BOT_MODE=sandbox node src/index.js",
+    "dev:sandbox": "BOT_MODE=sandbox node --watch src/index.js",
     "register-commands": "node scripts/register-commands.js",
+    "register-commands:sandbox": "BOT_MODE=sandbox node scripts/register-commands.js",
     "invite": "node scripts/invite-url.js",
     "test": "node --test test/*.test.js"
   },

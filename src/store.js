@@ -63,7 +63,7 @@ export function defaultConfig() {
       embedColorSummary: "#5865F2",
       quietHoursStart: null,
       quietHoursEnd: null,
-      pingOnStatusChange: true,
+      pingOnStatusChange: process.env.PING_ON_STATUS_CHANGE !== "false",
       pingOnNewBoy: true,
       dailySummaryEnabled: true,
       businessHoursOpen: process.env.BUSINESS_HOURS_OPEN?.trim() || "13:00",

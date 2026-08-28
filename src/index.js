@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./bootstrap-env.js";
 import {
   Client,
   GatewayIntentBits,
@@ -15,6 +15,7 @@ import { startNotifier, restartNotifier } from "./notifier.js";
 import { startMonitor } from "./monitor.js";
 import { scheduleProcessRestart } from "./restart.js";
 import { startDailySummaryScheduler } from "./daily-stats.js";
+import { isSandboxMode, getBotModeLabel } from "./env-mode.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
@@ -28,6 +29,8 @@ const clientId = process.env.DISCORD_CLIENT_ID;
 const guildId = process.env.DISCORD_GUILD_ID;
 
 console.log("[boot] NODE_ENV=", process.env.NODE_ENV || "development");
+console.log("[boot] BOT_MODE=", getBotModeLabel(), isSandboxMode() ? "🧪" : "");
+console.log("[boot] DATA_DIR=", process.env.DATA_DIR || "data");
 console.log("[boot] DISCORD_CLIENT_ID=", clientId ? "set" : "missing");
 console.log("[boot] DISCORD_GUILD_ID=", guildId || "(global slash registration)");
 console.log("[boot] PORT=", process.env.PORT || "(default 8080 for health)");
@@ -85,8 +88,16 @@ client.once(Events.ClientReady, async (c) => {
     startMonitor(client, getConfig, persistConfig);
     startDailySummaryScheduler(client, getConfig, persistConfig);
 
+    if (isSandboxMode()) {
+      console.log(
+        "[boot] 🧪 サンドボックス: 本番とは別 DATA_DIR / 別 Bot トークンで運用してください"
+      );
+    }
+
     if (config.notifyEnabled) {
       startNotifier(client, getConfig, persistConfig, buildNotificationEmbed);
+    } else if (isSandboxMode()) {
+      console.log("[boot] 定期通知: OFF（サンドボックス既定。NOTIFY_ENABLED=true で有効化可）");
     }
   } catch (err) {
     console.error("[warn] 起動後処理エラー（Bot本体は稼働中）:", err);

@@ -2,6 +2,11 @@ import { EmbedBuilder } from "discord.js";
 import { getMonitoredBoys, getBoysByStatus } from "./store.js";
 import { STATUS } from "./scraper.js";
 import { formatDurationMinutes, formatSessionPeriod } from "./business-hours.js";
+import { isSandboxMode } from "./env-mode.js";
+
+function sandboxTitle(title) {
+  return isSandboxMode() ? `🧪 ${title}` : title;
+}
 
 function sortBoys(boys, sortBy) {
   const sorted = [...boys];
@@ -46,7 +51,7 @@ export function buildNotificationEmbed(config) {
   const onlineCount = waiting.length + inCall.length;
 
   const embed = new EmbedBuilder()
-    .setTitle(`📡 ${config.storeName} — オンライン`)
+    .setTitle(sandboxTitle(`📡 ${config.storeName} — オンライン`))
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
@@ -116,7 +121,7 @@ export function buildStatusEmbed(config) {
   };
 
   const embed = new EmbedBuilder()
-    .setTitle(`📡 ${config.storeName} — オンライン稼働状況`)
+    .setTitle(sandboxTitle(`📡 ${config.storeName} — オンライン稼働状況`))
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
@@ -213,7 +218,7 @@ export function buildDailySummaryEmbed(config, stats, options = {}) {
     : `📊 ${config.storeName} — 本日のオンライン稼働サマリー`;
 
   const embed = new EmbedBuilder()
-    .setTitle(title)
+    .setTitle(sandboxTitle(title))
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(options.asOf || new Date());
 

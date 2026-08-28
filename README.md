@@ -133,6 +133,15 @@ npm start
 npm test
 ```
 
+### サンドボックス（機能テスト）
+
+本番 Bot に影響しないテスト環境: [SANDBOX.md](./SANDBOX.md)
+
+```bash
+cp sandbox.env.example .env.sandbox
+npm run dev:sandbox
+```
+
 ## 注意事項
 
 - x77.jp は年齢確認ページがあるため、Bot は自動的にセッション Cookie を取得します

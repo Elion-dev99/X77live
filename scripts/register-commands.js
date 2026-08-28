@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../src/bootstrap-env.js";
 import { REST, Routes } from "discord.js";
 import { buildSlashCommands } from "../src/slash-commands.js";
 
