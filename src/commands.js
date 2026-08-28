@@ -12,7 +12,10 @@ import {
   loadReportDocument,
   buildInterimReportFiles,
 } from "./daily-report-files.js";
-import { getCurrentBusinessDayStats } from "./daily-stats.js";
+import {
+  restoreConfigFromBackup,
+  listConfigBackups,
+} from "./config-backup.js";
 import {
   buildStatusEmbed,
   buildNotificationEmbed,
@@ -345,6 +348,39 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
+    case "restore_config": {
+      const backupName = parsed.backupName?.trim() || "latest";
+      const restored = restoreConfigFromBackup(backupName);
+      if (!restored.ok) {
+        return {
+          type: "text",
+          content: `⚠️ 復元に失敗しました: ${restored.error}`,
+          ephemeral: true,
+        };
+      }
+
+      reloadConfig();
+      restartMonitor(clientRef, getConfig, persistConfig);
+
+      const recent = listConfigBackups(3)
+        .map((item) => `\`${item.name}\``)
+        .join(" / ");
+
+      return {
+        type: "text",
+        content: [
+          "✅ **config.json をバックアップから復元しました。**",
+          `使用ファイル: \`${backupName === "latest" ? "config-latest.json" : backupName}\``,
+          "",
+          "監視ループを再起動しました。",
+          recent ? `直近バックアップ: ${recent}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        ephemeral: true,
+      };
+    }
+
     case "restart_server": {
       addHistory(config, {
         type: "bot_restart",
@@ -474,6 +510,7 @@ export async function handleCommand(interaction, parsed) {
           "• `/再起動` — Bot サーバー再起動",
           "• `/レポート一覧` `/レポート取得` — 確定レポート",
           "• `/レポート途中` — 営業日の現時点までの暫定レポート",
+          "• `/設定復元` — config.json をバックアップから復元",
           "• `/ログアウト` — セッション終了",
           "",
           "未ログイン時は各コマンドの `パスワード` オプションでも実行できます。",
@@ -482,10 +519,13 @@ export async function handleCommand(interaction, parsed) {
           `- **${config.pollIntervalMinutes || 2}分** ごとに x77.jp をチェック`,
           `- **${config.notifyIntervalMinutes}分** ごとに Discord へ定期通知`,
           `- **新規ボーイ** がロスターに追加されると通知`,
-          `- **毎日 01:00** に本日のオンライン稼働サマリーを投稿（営業 13:00〜翌01:00）`,
+          `- **毎日 01:00** に本日のオンライン稼働サマリーを投稿（待機/通話時間を分離集計）`,
+          `- **日曜営業終了後（月 01:00）** に週間サマリーを投稿（月〜日）`,
           `- サマリーは \`data/reports/営業日.json\` と \`.csv\` にも保存`,
+          `- **${config.settings.configBackupIntervalHours || 3}時間** ごとに \`data/backups/config-latest.json\` を自動保存`,
           `- 営業中は **${config.settings.reportBackupIntervalHours || 3}時間** ごとにレポートを自動バックアップ`,
           `- x77.jp 取得が **${config.settings.scrapeAlertThreshold || 3}回** 連続失敗すると **管理者DM** に警告（復旧時も通知）`,
+          `- 監視が **${config.settings.botLivenessMinutes || 10}分** 更新されないと **管理者DM** に死活アラート`,
           `- 営業中バックアップ完了も **管理者DM** に通知（\`ADMIN_USER_ID\`）`,
         ].join("\n"),
       };

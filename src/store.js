@@ -60,6 +60,12 @@ export function defaultConfig() {
     lastDailySummarySessionKey: null,
     lastReportBackupAt: null,
     lastReportBackupSessionKey: null,
+    lastConfigBackupAt: null,
+    lastWeeklySummaryWeekKey: null,
+    botLiveness: {
+      alertSent: false,
+      lastAlertAt: null,
+    },
     scrapeHealth: {
       consecutiveFailures: 0,
       lastFailureAt: null,
@@ -89,6 +95,12 @@ export function defaultConfig() {
       reportBackupIntervalHours:
         Number(process.env.REPORT_BACKUP_INTERVAL_HOURS) || 3,
       reportBackupNotifyAdmin: process.env.REPORT_BACKUP_NOTIFY_ADMIN !== "false",
+      configBackupEnabled: process.env.CONFIG_BACKUP_ENABLED !== "false",
+      configBackupIntervalHours:
+        Number(process.env.CONFIG_BACKUP_INTERVAL_HOURS) || 3,
+      botLivenessEnabled: process.env.BOT_LIVENESS_ENABLED !== "false",
+      botLivenessMinutes: Number(process.env.BOT_LIVENESS_MINUTES) || 10,
+      weeklySummaryEnabled: process.env.WEEKLY_SUMMARY_ENABLED !== "false",
       statusChangeChannelId: null,
       maxHistoryEntries: 200,
       sortBy: "name",
@@ -135,6 +147,14 @@ export function loadConfig() {
       lastDailySummarySessionKey: raw.lastDailySummarySessionKey || null,
       lastReportBackupAt: raw.lastReportBackupAt || null,
       lastReportBackupSessionKey: raw.lastReportBackupSessionKey || null,
+      lastConfigBackupAt: raw.lastConfigBackupAt || null,
+      lastWeeklySummaryWeekKey: raw.lastWeeklySummaryWeekKey || null,
+      botLiveness: {
+        ...defaults.botLiveness,
+        ...(raw.botLiveness && typeof raw.botLiveness === "object"
+          ? raw.botLiveness
+          : {}),
+      },
       scrapeHealth: {
         ...defaults.scrapeHealth,
         ...(raw.scrapeHealth && typeof raw.scrapeHealth === "object"

@@ -17,12 +17,21 @@ function ensureReportsDir(dir = REPORTS_DIR) {
 export function buildDailyReportDocument(config, stats, generatedAt = new Date()) {
   const settings = config.settings || {};
   const boys = Object.entries(stats.boys || {})
-    .map(([boyId, info]) => ({
-      boyId,
-      name: info.name,
-      onlineMinutes: Math.round(info.onlineMinutes || 0),
-      onlineDuration: formatDurationMinutes(info.onlineMinutes || 0),
-    }))
+    .map(([boyId, info]) => {
+      const onlineMinutes = Math.round(info.onlineMinutes || 0);
+      const waitingMinutes = Math.round(info.waitingMinutes || 0);
+      const inCallMinutes = Math.round(info.inCallMinutes || 0);
+      return {
+        boyId,
+        name: info.name,
+        onlineMinutes,
+        waitingMinutes,
+        inCallMinutes,
+        onlineDuration: formatDurationMinutes(onlineMinutes),
+        waitingDuration: formatDurationMinutes(waitingMinutes),
+        inCallDuration: formatDurationMinutes(inCallMinutes),
+      };
+    })
     .sort(
       (a, b) =>
         b.onlineMinutes - a.onlineMinutes ||
@@ -30,6 +39,8 @@ export function buildDailyReportDocument(config, stats, generatedAt = new Date()
     );
 
   const totalOnlineMinutes = boys.reduce((sum, b) => sum + b.onlineMinutes, 0);
+  const totalWaitingMinutes = boys.reduce((sum, b) => sum + b.waitingMinutes, 0);
+  const totalInCallMinutes = boys.reduce((sum, b) => sum + b.inCallMinutes, 0);
 
   return {
     sessionKey: stats.sessionKey,
@@ -43,7 +54,11 @@ export function buildDailyReportDocument(config, stats, generatedAt = new Date()
     generatedAt: generatedAt.toISOString(),
     onlineCount: boys.length,
     totalOnlineMinutes,
+    totalWaitingMinutes,
+    totalInCallMinutes,
     totalOnlineDuration: formatDurationMinutes(totalOnlineMinutes),
+    totalWaitingDuration: formatDurationMinutes(totalWaitingMinutes),
+    totalInCallDuration: formatDurationMinutes(totalInCallMinutes),
     boys,
   };
 }
@@ -58,7 +73,7 @@ function escapeCsv(value) {
 
 export function buildDailyReportCsv(report) {
   const lines = [
-    "session_key,store_name,shop_id,period,generated_at,boy_id,name,online_minutes,online_duration",
+    "session_key,store_name,shop_id,period,generated_at,boy_id,name,online_minutes,waiting_minutes,in_call_minutes,online_duration,waiting_duration,in_call_duration",
   ];
 
   for (const boy of report.boys) {
@@ -72,7 +87,11 @@ export function buildDailyReportCsv(report) {
         escapeCsv(boy.boyId),
         escapeCsv(boy.name),
         boy.onlineMinutes,
+        boy.waitingMinutes,
+        boy.inCallMinutes,
         escapeCsv(boy.onlineDuration),
+        escapeCsv(boy.waitingDuration),
+        escapeCsv(boy.inCallDuration),
       ].join(",")
     );
   }
@@ -88,6 +107,10 @@ export function buildDailyReportCsv(report) {
         "",
         "",
         0,
+        0,
+        0,
+        "",
+        "",
         "",
       ].join(",")
     );
