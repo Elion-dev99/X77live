@@ -1,0 +1,18 @@
+# Bot-Hosting SFTP 接続情報（ローカル用）
+# コピー: cp bot-hosting.sftp.example .env.sftp
+# ⚠️ .env.sftp は Git にコミットしないこと
+
+# Bot-Hosting → Settings → SFTP から確認
+SFTP_HOST=fi3.bot-hosting.net
+SFTP_PORT=2022
+SFTP_USER=your-username-here
+SFTP_PASSWORD=your-password-here
+
+# サーバー上のパス（通常は /home/container）
+SFTP_REMOTE_ROOT=/home/container
+
+# レポート保存先（Bot の DATA_DIR=data の場合）
+SFTP_REMOTE_REPORTS=/home/container/data/reports
+
+# ローカルに保存するフォルダ
+SFTP_LOCAL_DIR=./downloads/reports

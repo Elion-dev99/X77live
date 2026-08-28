@@ -52,6 +52,64 @@
 
 **Git** タブでリポジトリをリンクし、**Auto Pull** を ON にすると `main` 更新時に自動同期できます。
 
+## 6. SFTP（レポートファイル取得）
+
+Bot-Hosting の **Files** タブは Git 用のため、Bot が保存する `data/reports/` は表示されません。**SFTP** で取得します。
+
+### 接続情報の確認
+
+Bot-Hosting ダッシュボード → 対象 Bot → **Settings** → **SFTP** に表示されます。
+
+| 項目 | 例 |
+|------|-----|
+| Host | `fi3.bot-hosting.net` |
+| Port | `2022` |
+| Username | `xxxx.jtd4xxqy`（Bot ごとに異なる） |
+| Password | SFTP 画面に表示（Secret） |
+
+### FileZilla / Cyberduck（GUI）
+
+| 項目 | 値 |
+|------|-----|
+| プロトコル | SFTP |
+| ホスト | `fi3.bot-hosting.net` |
+| ポート | `2022` |
+| ユーザー名 | SFTP 画面の Username |
+| パスワード | SFTP 画面の Password |
+
+接続後、リモート側で次のフォルダを開きます:
+
+```
+/home/container/data/reports/
+├── index.json
+├── 2026-08-28.json
+└── 2026-08-28.csv
+```
+
+### コマンドで一括取得（ローカル PC）
+
+```bash
+cp bot-hosting.sftp.example .env.sftp
+# .env.sftp に Username / Password を記入
+
+bash scripts/sftp-pull-reports.sh
+```
+
+`./downloads/reports/` に JSON / CSV が保存されます。
+
+`sshpass` があるとパスワード自動入力できます（macOS: `brew install sshpass`）。
+
+### Discord から取得
+
+SFTP 不要で、Discord 上からも取得できます:
+
+```
+/レポート一覧
+/レポート取得 営業日:2026-08-28 形式:CSV
+```
+
+（管理者パスワード必須）
+
 ## 注意
 
 - **4日ごとに Renew**（無料プラン）
