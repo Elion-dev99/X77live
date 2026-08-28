@@ -18,6 +18,11 @@ export function startNotifier(client, getConfig, saveConfigFn, buildEmbed) {
     await sendPeriodicNotification(getConfig, saveConfigFn, buildEmbed);
   }, intervalMs);
 
+  // 起動直後にも1回送信
+  sendPeriodicNotification(getConfig, saveConfigFn, buildEmbed).catch((err) => {
+    console.error("[notifier] 初回通知エラー:", err.message);
+  });
+
   return intervalHandle;
 }
 

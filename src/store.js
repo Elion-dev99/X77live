@@ -41,6 +41,12 @@ export function defaultConfig() {
       .map((s) => s.trim())
       .filter(Boolean),
     mentionRoleId: process.env.MENTION_ROLE_ID?.trim() || null,
+    auth: {
+      passwordHash: null,
+      passwordSalt: null,
+      sessions: {},
+      sessionHours: Number(process.env.AUTH_SESSION_HOURS) || 8,
+    },
     boys: {},
     boyStatuses: {},
     history: [],
@@ -67,19 +73,26 @@ export function defaultConfig() {
   };
 }
 
+import {
+  initPasswordFromEnv,
+  ensureAuthConfig,
+} from "./auth.js";
+
 export function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) {
     const config = defaultConfig();
+    initPasswordFromEnv(config);
     saveConfig(config);
     return config;
   }
   try {
     const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
     const defaults = defaultConfig();
-    return {
+    const config = {
       ...defaults,
       ...raw,
       settings: { ...defaults.settings, ...(raw.settings || {}) },
+      auth: { ...defaults.auth, ...(raw.auth || {}) },
       boys: raw.boys && typeof raw.boys === "object" ? raw.boys : {},
       boyStatuses:
         raw.boyStatuses && typeof raw.boyStatuses === "object"
@@ -90,6 +103,9 @@ export function loadConfig() {
         ? raw.adminRoleIds
         : defaults.adminRoleIds,
     };
+    ensureAuthConfig(config);
+    initPasswordFromEnv(config);
+    return config;
   } catch (err) {
     console.error("[store] config load error:", err.message);
     return defaultConfig();

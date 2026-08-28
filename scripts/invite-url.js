@@ -6,7 +6,8 @@ if (!clientId) {
   process.exit(1);
 }
 
-const permissions = "268435456"; // Manage Guild
+// View Channels + Send Messages + Embed Links + Read Message History
+const permissions = "84992";
 const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=${permissions}&scope=bot%20applications.commands`;
 
 console.log("Bot 招待URL:");

@@ -1,7 +1,14 @@
 import {
   SlashCommandBuilder,
-  PermissionFlagsBits,
 } from "discord.js";
+
+function passwordOption(required = false) {
+  return (opt) =>
+    opt
+      .setName("パスワード")
+      .setDescription("管理パスワード（未ログイン時は必須）")
+      .setRequired(required);
+}
 
 export function buildSlashCommands() {
   return [
@@ -30,30 +37,44 @@ export function buildSlashCommands() {
       ),
 
     new SlashCommandBuilder()
+      .setName("認証")
+      .setDescription("管理パスワードでログイン（カスタマイズ操作用）")
+      .addStringOption((opt) =>
+        opt
+          .setName("パスワード")
+          .setDescription("管理パスワード")
+          .setRequired(true)
+      ),
+
+    new SlashCommandBuilder()
+      .setName("ログアウト")
+      .setDescription("管理セッションを終了"),
+
+    new SlashCommandBuilder()
       .setName("監視除外")
-      .setDescription("指定ボーイを監視対象から除外（管理者）")
+      .setDescription("指定ボーイを監視対象から除外")
       .addStringOption((opt) =>
         opt
           .setName("boy_id")
           .setDescription("除外する boy_id（/一覧 で確認）")
           .setRequired(true)
       )
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+      .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
       .setName("監視再開")
-      .setDescription("除外したボーイを監視対象に戻す（管理者）")
+      .setDescription("除外したボーイを監視対象に戻す")
       .addStringOption((opt) =>
         opt
           .setName("boy_id")
           .setDescription("再開する boy_id")
           .setRequired(true)
       )
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+      .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
       .setName("設定")
-      .setDescription("Bot設定を変更（管理者）")
+      .setDescription("Bot設定を変更")
       .addStringOption((opt) =>
         opt
           .setName("項目")
@@ -74,30 +95,49 @@ export function buildSlashCommands() {
             { name: "通知停止開始時刻", value: "quietStart" },
             { name: "通知停止終了時刻", value: "quietEnd" },
             { name: "フッターテキスト", value: "footerText" },
-            { name: "並び順", value: "sortBy" }
+            { name: "並び順", value: "sortBy" },
+            { name: "認証セッション時間（時間）", value: "sessionHours" }
           )
       )
       .addStringOption((opt) =>
-        opt
-          .setName("値")
-          .setDescription("設定値")
-          .setRequired(true)
+        opt.setName("値").setDescription("設定値").setRequired(true)
       )
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+      .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
       .setName("設定確認")
-      .setDescription("現在のBot設定を表示"),
+      .setDescription("現在のBot設定を表示")
+      .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
       .setName("通知テスト")
-      .setDescription("最新データ取得 + 定期通知プレビュー（管理者）")
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+      .setDescription("最新データ取得 + 定期通知プレビュー")
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
+      .setName("パスワード変更")
+      .setDescription("管理パスワードを変更")
+      .addStringOption((opt) =>
+        opt
+          .setName("現在のパスワード")
+          .setDescription("現在の管理パスワード")
+          .setRequired(true)
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("新しいパスワード")
+          .setDescription("新しい管理パスワード（4文字以上）")
+          .setRequired(true)
+      ),
 
     new SlashCommandBuilder()
       .setName("ヘルプ")
       .setDescription("コマンド一覧と使い方"),
   ].map((cmd) => cmd.toJSON());
+}
+
+function getPassword(interaction) {
+  return interaction.options.getString("パスワード") || null;
 }
 
 export function parseSlashInteraction(interaction) {
@@ -115,26 +155,48 @@ export function parseSlashInteraction(interaction) {
         command: "history",
         limit: interaction.options.getInteger("件数") || 10,
       };
+    case "認証":
+      return {
+        command: "login",
+        password: interaction.options.getString("パスワード"),
+      };
+    case "ログアウト":
+      return { command: "logout" };
     case "監視除外":
       return {
         command: "exclude_boy",
         boyId: interaction.options.getString("boy_id"),
+        password: getPassword(interaction),
       };
     case "監視再開":
       return {
         command: "include_boy",
         boyId: interaction.options.getString("boy_id"),
+        password: getPassword(interaction),
       };
     case "設定":
       return {
         command: "setting",
         key: interaction.options.getString("項目"),
         value: interaction.options.getString("値"),
+        password: getPassword(interaction),
       };
     case "設定確認":
-      return { command: "settings_show" };
+      return {
+        command: "settings_show",
+        password: getPassword(interaction),
+      };
     case "通知テスト":
-      return { command: "notify_test" };
+      return {
+        command: "notify_test",
+        password: getPassword(interaction),
+      };
+    case "パスワード変更":
+      return {
+        command: "change_password",
+        currentPassword: interaction.options.getString("現在のパスワード"),
+        newPassword: interaction.options.getString("新しいパスワード"),
+      };
     case "ヘルプ":
       return { command: "help" };
     default:

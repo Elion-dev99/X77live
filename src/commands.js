@@ -1,6 +1,6 @@
-import { isAdmin, applySetting } from "./config.js";
+import { applySetting } from "./config.js";
 import {
-  getConfig as getStoreConfig,
+  loadConfig as getStoreConfig,
   saveConfig,
   addHistory,
 } from "./store.js";
@@ -15,6 +15,16 @@ import {
   restartNotifier,
 } from "./notifier.js";
 import { runScrape, restartMonitor } from "./monitor.js";
+import {
+  requireCustomizeAuth,
+  verifyPassword,
+  authenticateUser,
+  logoutUser,
+  createPasswordRecord,
+  isAuthenticated,
+  getSessionExpiry,
+  isPasswordConfigured,
+} from "./auth.js";
 
 let configCache = null;
 /** @type {import('discord.js').Client|null} */
@@ -37,6 +47,24 @@ export function persistConfig() {
 export function reloadConfig() {
   configCache = getStoreConfig();
   return configCache;
+}
+
+function authError(result) {
+  return {
+    type: "text",
+    content: result.message,
+    ephemeral: true,
+  };
+}
+
+function checkCustomizeAuth(interaction, password) {
+  const config = getConfig();
+  const result = requireCustomizeAuth(interaction, config, password);
+  if (!result.ok) {
+    return authError(result);
+  }
+  persistConfig();
+  return null;
 }
 
 export async function handleCommand(interaction, parsed) {
@@ -76,10 +104,85 @@ export async function handleCommand(interaction, parsed) {
       }
     }
 
-    case "exclude_boy": {
-      if (!isAdmin(interaction.member, config)) {
-        return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
+    case "login": {
+      if (!isPasswordConfigured(config)) {
+        return {
+          type: "text",
+          content:
+            "⚠️ 管理パスワードが未設定です。Railway Variables に `ADMIN_PASSWORD` を設定してください。",
+          ephemeral: true,
+        };
       }
+      if (!verifyPassword(parsed.password, config)) {
+        return {
+          type: "text",
+          content: "⚠️ パスワードが正しくありません。",
+          ephemeral: true,
+        };
+      }
+      authenticateUser(interaction.user.id, config);
+      persistConfig();
+      const expires = getSessionExpiry(interaction.user.id, config);
+      const time = new Date(expires).toLocaleString("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return {
+        type: "text",
+        content: `✅ 認証しました（有効期限: ${time} まで）\nカスタマイズコマンドが使えます。`,
+        ephemeral: true,
+      };
+    }
+
+    case "logout": {
+      logoutUser(interaction.user.id, config);
+      persistConfig();
+      return {
+        type: "text",
+        content: "✅ ログアウトしました。",
+        ephemeral: true,
+      };
+    }
+
+    case "change_password": {
+      if (!isPasswordConfigured(config)) {
+        return {
+          type: "text",
+          content: "⚠️ 管理パスワードが未設定です。",
+          ephemeral: true,
+        };
+      }
+      if (!verifyPassword(parsed.currentPassword, config)) {
+        return {
+          type: "text",
+          content: "⚠️ 現在のパスワードが正しくありません。",
+          ephemeral: true,
+        };
+      }
+      if (!parsed.newPassword || parsed.newPassword.length < 4) {
+        return {
+          type: "text",
+          content: "⚠️ 新しいパスワードは4文字以上にしてください。",
+          ephemeral: true,
+        };
+      }
+      const record = createPasswordRecord(parsed.newPassword);
+      config.auth.passwordSalt = record.passwordSalt;
+      config.auth.passwordHash = record.passwordHash;
+      config.auth.sessions = {};
+      authenticateUser(interaction.user.id, config);
+      persistConfig();
+      return {
+        type: "text",
+        content: "✅ パスワードを変更しました。全セッションをリセットしました。",
+        ephemeral: true,
+      };
+    }
+
+    case "exclude_boy": {
+      const denied = checkCustomizeAuth(interaction, parsed.password);
+      if (denied) return denied;
 
       const boyId = parsed.boyId;
       if (!config.boys[boyId] && !config.boyStatuses[boyId]) {
@@ -107,13 +210,13 @@ export async function handleCommand(interaction, parsed) {
       return {
         type: "text",
         content: `✅ **${name}** (ID: ${boyId}) を監視対象から除外しました。`,
+        ephemeral: true,
       };
     }
 
     case "include_boy": {
-      if (!isAdmin(interaction.member, config)) {
-        return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
-      }
+      const denied = checkCustomizeAuth(interaction, parsed.password);
+      if (denied) return denied;
 
       const boyId = parsed.boyId;
       if (!config.boys[boyId]) {
@@ -137,13 +240,13 @@ export async function handleCommand(interaction, parsed) {
       return {
         type: "text",
         content: `✅ **${config.boys[boyId].name}** (ID: ${boyId}) を監視対象に再追加しました。`,
+        ephemeral: true,
       };
     }
 
     case "setting": {
-      if (!isAdmin(interaction.member, config)) {
-        return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
-      }
+      const denied = checkCustomizeAuth(interaction, parsed.password);
+      if (denied) return denied;
 
       let value = parsed.value;
 
@@ -152,7 +255,8 @@ export async function handleCommand(interaction, parsed) {
         if (!channelMatch) {
           return {
             type: "text",
-            content: "⚠️ チャンネルID または <#チャンネルID> 形式で指定してください。",
+            content:
+              "⚠️ チャンネルID または <#チャンネルID> 形式で指定してください。",
             ephemeral: true,
           };
         }
@@ -178,10 +282,7 @@ export async function handleCommand(interaction, parsed) {
 
       persistConfig();
 
-      if (
-        parsed.key === "notifyInterval" ||
-        parsed.key === "notifyEnabled"
-      ) {
+      if (parsed.key === "notifyInterval" || parsed.key === "notifyEnabled") {
         if (clientRef) {
           restartNotifier(
             clientRef,
@@ -201,16 +302,23 @@ export async function handleCommand(interaction, parsed) {
       return {
         type: "text",
         content: `✅ 設定を更新しました: **${parsed.key}** = \`${value}\``,
+        ephemeral: true,
       };
     }
 
-    case "settings_show":
-      return { type: "embed", embed: buildSettingsEmbed(config) };
+    case "settings_show": {
+      const denied = checkCustomizeAuth(interaction, parsed.password);
+      if (denied) return denied;
+      return {
+        type: "embed",
+        embed: buildSettingsEmbed(config),
+        ephemeral: true,
+      };
+    }
 
     case "notify_test": {
-      if (!isAdmin(interaction.member, config)) {
-        return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
-      }
+      const denied = checkCustomizeAuth(interaction, parsed.password);
+      if (denied) return denied;
 
       await runScrape(getConfig, persistConfig, clientRef);
 
@@ -231,26 +339,28 @@ export async function handleCommand(interaction, parsed) {
         content: [
           "## 📡 X77live 大阪店 オンライン監視Bot",
           "",
-          "x77.jp の [2ショットページ](https://x77.jp/live/?mode=online) から",
-          "大阪店ボーイの **待機中 / 通話中 / オフライン** を自動監視します。",
+          "### 一般コマンド（誰でも可）",
+          "• `/状況` `/一覧` `/更新` `/履歴`",
           "",
-          "### コマンド",
-          "• `/状況` — 現在の稼働状況",
-          "• `/一覧` — 全ボーイのステータス一覧",
-          "• `/更新` — x77.jp から即時取得",
-          "• `/履歴` — ステータス変更履歴",
-          "• `/設定` — 通知間隔・表示項目等を変更",
-          "• `/設定確認` — 現在の設定",
-          "• `/通知テスト` — 定期通知のプレビュー",
+          "### カスタマイズコマンド（🔒 パスワード必須）",
+          "• `/認証` — パスワードでログイン（セッション有効）",
+          "• `/設定` `/設定確認` `/通知テスト`",
+          "• `/監視除外` `/監視再開` `/パスワード変更`",
+          "• `/ログアウト` — セッション終了",
+          "",
+          "未ログイン時は各コマンドの `パスワード` オプションでも実行できます。",
           "",
           "### 自動監視",
           `- **${config.pollIntervalMinutes || 2}分** ごとに x77.jp をチェック`,
           `- **${config.notifyIntervalMinutes}分** ごとに Discord へ定期通知`,
-          "- ステータス変更時に即時通知（設定で ON/OFF）",
         ].join("\n"),
       };
 
     default:
       return { type: "text", content: "⚠️ 不明なコマンドです。", ephemeral: true };
   }
+}
+
+export function isUserAuthenticated(userId) {
+  return isAuthenticated(userId, getConfig());
 }

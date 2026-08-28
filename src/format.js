@@ -164,6 +164,11 @@ export function buildSettingsEmbed(config) {
       inline: true,
     },
     {
+      name: "認証セッション",
+      value: `${config.auth?.sessionHours || 8} 時間`,
+      inline: true,
+    },
+    {
       name: "ステータス変更通知",
       value: config.settings.pingOnStatusChange ? "✅ 有効" : "❌ 無効",
       inline: true,
