@@ -1,38 +1,32 @@
+import { isAdmin, applySetting } from "./config.js";
 import {
-  loadConfig,
+  getConfig as getStoreConfig,
   saveConfig,
-  getOrCreateMember,
-  getMember,
-  startSession,
-  endSession,
-  isOnline,
   addHistory,
 } from "./store.js";
-import { isAdmin, applySetting, SETTING_KEYS } from "./config.js";
 import {
   buildStatusEmbed,
   buildMemberListEmbed,
   buildSettingsEmbed,
   buildHistoryEmbed,
-  buildStatusChangeMessage,
-  formatDuration,
 } from "./format.js";
 import {
-  sendStatusChangeNotification,
   sendPeriodicNotification,
   restartNotifier,
 } from "./notifier.js";
+import { runScrape, restartMonitor } from "./monitor.js";
 
 let configCache = null;
+/** @type {import('discord.js').Client|null} */
 let clientRef = null;
 
 export function initCommands(client) {
   clientRef = client;
-  configCache = loadConfig();
+  configCache = getStoreConfig();
 }
 
 export function getConfig() {
-  if (!configCache) configCache = loadConfig();
+  if (!configCache) configCache = getStoreConfig();
   return configCache;
 }
 
@@ -41,86 +35,14 @@ export function persistConfig() {
 }
 
 export function reloadConfig() {
-  configCache = loadConfig();
+  configCache = getStoreConfig();
   return configCache;
-}
-
-function ensureMemberRegistered(config, userId, displayName) {
-  const member = getMember(config, userId);
-  if (!member || !member.active) {
-    return {
-      ok: false,
-      message:
-        "⚠️ 在籍メンバーとして登録されていません。管理者に `/メンバー登録` を依頼してください。",
-    };
-  }
-  getOrCreateMember(config, userId, displayName);
-  return { ok: true };
 }
 
 export async function handleCommand(interaction, parsed) {
   const config = getConfig();
-  const userId = interaction.user.id;
-  const displayName =
-    interaction.member?.displayName ||
-    interaction.user.displayName ||
-    interaction.user.username;
 
   switch (parsed.command) {
-    case "start": {
-      const check = ensureMemberRegistered(config, userId, displayName);
-      if (!check.ok) return { type: "text", content: check.message };
-
-      if (isOnline(config, userId)) {
-        const session = config.sessions[userId];
-        return {
-          type: "text",
-          content: `⚠️ すでにオンライン中です（開始: ${new Date(session.startedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}）`,
-          ephemeral: true,
-        };
-      }
-
-      startSession(config, userId, parsed.note);
-      persistConfig();
-
-      const msg = buildStatusChangeMessage(config, userId, "start", displayName);
-      if (clientRef) {
-        await sendStatusChangeNotification(clientRef, config, msg, userId);
-      }
-
-      const noteText = parsed.note ? `\n📝 メモ: ${parsed.note}` : "";
-      return {
-        type: "text",
-        content: `🟢 **${displayName}** のオンライン稼働を開始しました！${noteText}`,
-      };
-    }
-
-    case "stop": {
-      const check = ensureMemberRegistered(config, userId, displayName);
-      if (!check.ok) return { type: "text", content: check.message };
-
-      if (!isOnline(config, userId)) {
-        return {
-          type: "text",
-          content: "⚠️ オンライン中ではありません。",
-          ephemeral: true,
-        };
-      }
-
-      const result = endSession(config, userId);
-      persistConfig();
-
-      const msg = buildStatusChangeMessage(config, userId, "end", displayName);
-      if (clientRef) {
-        await sendStatusChangeNotification(clientRef, config, msg, userId);
-      }
-
-      return {
-        type: "text",
-        content: `⚪ **${displayName}** のオンライン稼働を終了しました（稼働時間: ${formatDuration(result.durationMs)}）`,
-      };
-    }
-
     case "status":
       return { type: "embed", embed: buildStatusEmbed(config) };
 
@@ -133,93 +55,88 @@ export async function handleCommand(interaction, parsed) {
         embed: buildHistoryEmbed(config, parsed.limit),
       };
 
-    case "add_member": {
+    case "refresh": {
+      await interaction.deferReply();
+      try {
+        const result = await runScrape(getConfig, persistConfig, clientRef);
+        const s = result.summary;
+        return {
+          type: "deferred",
+          interaction,
+          content: `✅ x77.jp から最新データを取得しました\n🟢 待機中: **${s.waiting}** / 📞 通話中: **${s.inCall}** / ⚪ オフライン: **${s.offline}**`,
+          embed: buildStatusEmbed(getConfig()),
+        };
+      } catch (err) {
+        return {
+          type: "deferred",
+          interaction,
+          content: `⚠️ 取得失敗: ${err.message}`,
+          ephemeral: true,
+        };
+      }
+    }
+
+    case "exclude_boy": {
       if (!isAdmin(interaction.member, config)) {
         return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
       }
 
-      const target = parsed.user;
-      const name = parsed.displayName || target.displayName || target.username;
-      getOrCreateMember(config, target.id, name);
-      addHistory(config, { type: "member_add", userId: target.id });
+      const boyId = parsed.boyId;
+      if (!config.boys[boyId] && !config.boyStatuses[boyId]) {
+        return {
+          type: "text",
+          content: "⚠️ この boy_id は見つかりません。",
+          ephemeral: true,
+        };
+      }
+
+      if (!config.boys[boyId]) {
+        config.boys[boyId] = {
+          name: config.boyStatuses[boyId]?.name || boyId,
+          excluded: true,
+        };
+      } else {
+        config.boys[boyId].excluded = true;
+      }
+
+      const name = config.boys[boyId].name;
+      delete config.boyStatuses[boyId];
+      addHistory(config, { type: "boy_exclude", boyId, name });
       persistConfig();
 
       return {
         type: "text",
-        content: `✅ **${name}** (<@${target.id}>) を在籍メンバーに登録しました。`,
+        content: `✅ **${name}** (ID: ${boyId}) を監視対象から除外しました。`,
       };
     }
 
-    case "remove_member": {
+    case "include_boy": {
       if (!isAdmin(interaction.member, config)) {
         return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
       }
 
-      const target = parsed.user;
-      const member = getMember(config, target.id);
-      if (!member) {
+      const boyId = parsed.boyId;
+      if (!config.boys[boyId]) {
         return {
           type: "text",
-          content: "⚠️ このユーザーは在籍メンバーに登録されていません。",
+          content: "⚠️ この boy_id は見つかりません。",
           ephemeral: true,
         };
       }
 
-      member.active = false;
-      if (isOnline(config, target.id)) {
-        endSession(config, target.id);
-      }
-      addHistory(config, { type: "member_remove", userId: target.id });
+      config.boys[boyId].excluded = false;
+      addHistory(config, {
+        type: "boy_include",
+        boyId,
+        name: config.boys[boyId].name,
+      });
       persistConfig();
+
+      await runScrape(getConfig, persistConfig, clientRef);
 
       return {
         type: "text",
-        content: `✅ **${member.displayName || member.name}** を在籍から削除しました。`,
-      };
-    }
-
-    case "sync_roles": {
-      if (!isAdmin(interaction.member, config)) {
-        return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
-      }
-
-      if (!config.memberRoleId) {
-        return {
-          type: "text",
-          content:
-            "⚠️ 在籍ロールが未設定です。`/設定 項目:在籍ロール 値:<ロールID>` で設定してください。",
-          ephemeral: true,
-        };
-      }
-
-      const guild = interaction.guild;
-      const role = await guild.roles.fetch(config.memberRoleId);
-      if (!role) {
-        return {
-          type: "text",
-          content: "⚠️ 在籍ロールが見つかりません。",
-          ephemeral: true,
-        };
-      }
-
-      let added = 0;
-      for (const [, guildMember] of role.members) {
-        const existing = getMember(config, guildMember.id);
-        if (!existing || !existing.active) {
-          getOrCreateMember(
-            config,
-            guildMember.id,
-            guildMember.displayName || guildMember.user.username
-          );
-          addHistory(config, { type: "member_add", userId: guildMember.id });
-          added++;
-        }
-      }
-      persistConfig();
-
-      return {
-        type: "text",
-        content: `✅ ロール **${role.name}** から **${added}** 名を新規登録しました（ロールメンバー合計: ${role.members.size} 名）。`,
+        content: `✅ **${config.boys[boyId].name}** (ID: ${boyId}) を監視対象に再追加しました。`,
       };
     }
 
@@ -242,7 +159,7 @@ export async function handleCommand(interaction, parsed) {
         value = channelMatch[1];
       }
 
-      if (parsed.key === "memberRole" || parsed.key === "mentionRole") {
+      if (parsed.key === "mentionRole") {
         const roleMatch = value.match(/^<@&(\d+)>$/) || value.match(/^(\d+)$/);
         if (!roleMatch) {
           return {
@@ -275,9 +192,11 @@ export async function handleCommand(interaction, parsed) {
         }
       }
 
-      const keyLabel = Object.entries(SETTING_KEYS).find(
-        ([, v]) => v === SETTING_KEYS[parsed.key]
-      )?.[0] || parsed.key;
+      if (parsed.key === "pollInterval") {
+        if (clientRef) {
+          restartMonitor(clientRef, getConfig, persistConfig);
+        }
+      }
 
       return {
         type: "text",
@@ -293,39 +212,16 @@ export async function handleCommand(interaction, parsed) {
         return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
       }
 
+      await runScrape(getConfig, persistConfig, clientRef);
+
       if (clientRef) {
         await sendPeriodicNotification(getConfig, persistConfig, buildStatusEmbed);
       }
 
       return {
         type: "text",
-        content: "✅ 通知テストを送信しました（通知チャンネルに届きます）。",
+        content: "✅ 最新データを取得し、通知テストを送信しました。",
         ephemeral: true,
-      };
-    }
-
-    case "force_stop": {
-      if (!isAdmin(interaction.member, config)) {
-        return { type: "text", content: "⚠️ 管理者権限が必要です。", ephemeral: true };
-      }
-
-      const target = parsed.user;
-      if (!isOnline(config, target.id)) {
-        return {
-          type: "text",
-          content: "⚠️ このユーザーはオンライン中ではありません。",
-          ephemeral: true,
-        };
-      }
-
-      const member = getMember(config, target.id);
-      const name = member?.displayName || target.displayName || target.username;
-      const result = endSession(config, target.id);
-      persistConfig();
-
-      return {
-        type: "text",
-        content: `✅ **${name}** のオンラインを強制終了しました（稼働時間: ${formatDuration(result.durationMs)}）`,
       };
     }
 
@@ -333,56 +229,28 @@ export async function handleCommand(interaction, parsed) {
       return {
         type: "text",
         content: [
-          "## 📡 X77live オンライン稼働管理Bot",
+          "## 📡 X77live 大阪店 オンライン監視Bot",
           "",
-          "### メンバー向け",
-          "• `/オンライン開始` — オンライン稼働を開始（メモ付き可）",
-          "• `/オンライン終了` — オンライン稼働を終了",
-          "• `/状況` — 現在の稼働状況を表示",
-          "• `/在籍一覧` — 在籍メンバー一覧",
-          "• `/履歴` — 最近の開始/終了履歴",
+          "x77.jp の [2ショットページ](https://x77.jp/live/?mode=online) から",
+          "大阪店ボーイの **待機中 / 通話中 / オフライン** を自動監視します。",
           "",
-          "### 管理者向け",
-          "• `/メンバー登録` — 在籍メンバーを追加",
-          "• `/メンバー削除` — 在籍メンバーを削除",
-          "• `/ロール同期` — 在籍ロールから自動登録",
-          "• `/設定` — 通知間隔・チャンネル等を変更",
-          "• `/設定確認` — 現在の設定を表示",
+          "### コマンド",
+          "• `/状況` — 現在の稼働状況",
+          "• `/一覧` — 全ボーイのステータス一覧",
+          "• `/更新` — x77.jp から即時取得",
+          "• `/履歴` — ステータス変更履歴",
+          "• `/設定` — 通知間隔・表示項目等を変更",
+          "• `/設定確認` — 現在の設定",
           "• `/通知テスト` — 定期通知のプレビュー",
-          "• `/強制終了` — 指定メンバーを強制オフライン",
           "",
-          "### 定期通知",
-          `デフォルト **10分** ごとに通知チャンネルへ稼働状況を送信します。`,
-          "`/設定` で間隔・表示項目・通知停止時間帯などをカスタマイズできます。",
+          "### 自動監視",
+          `- **${config.pollIntervalMinutes || 2}分** ごとに x77.jp をチェック`,
+          `- **${config.notifyIntervalMinutes}分** ごとに Discord へ定期通知`,
+          "- ステータス変更時に即時通知（設定で ON/OFF）",
         ].join("\n"),
       };
 
     default:
       return { type: "text", content: "⚠️ 不明なコマンドです。", ephemeral: true };
-  }
-}
-
-export async function syncMembersFromRole(guild, config) {
-  if (!config.memberRoleId) return;
-
-  try {
-    const role = await guild.roles.fetch(config.memberRoleId);
-    if (!role) return;
-
-    let changed = false;
-    for (const [, guildMember] of role.members) {
-      const existing = getMember(config, guildMember.id);
-      if (!existing || !existing.active) {
-        getOrCreateMember(
-          config,
-          guildMember.id,
-          guildMember.displayName || guildMember.user.username
-        );
-        changed = true;
-      }
-    }
-    if (changed) persistConfig();
-  } catch (err) {
-    console.warn("[sync] role sync error:", err.message);
   }
 }

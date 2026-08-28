@@ -31,38 +31,39 @@ const CONFIG_FILE = path.join(DATA_DIR, "config.json");
 export function defaultConfig() {
   return {
     storeName: process.env.STORE_NAME?.trim() || "大阪店",
+    shopId: process.env.SHOP_ID?.trim() || "4",
     notifyChannelId: process.env.NOTIFY_CHANNEL_ID?.trim() || null,
     notifyIntervalMinutes: Number(process.env.NOTIFY_INTERVAL_MINUTES) || 10,
+    pollIntervalMinutes: Number(process.env.POLL_INTERVAL_MINUTES) || 2,
     notifyEnabled: process.env.NOTIFY_ENABLED !== "false",
-    memberRoleId: process.env.MEMBER_ROLE_ID?.trim() || null,
     adminRoleIds: (process.env.ADMIN_ROLE_IDS || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    mentionOffline: process.env.MENTION_OFFLINE === "true",
     mentionRoleId: process.env.MENTION_ROLE_ID?.trim() || null,
-    members: {},
-    sessions: {},
+    boys: {},
+    boyStatuses: {},
     history: [],
     settings: {
-      showDuration: true,
+      showWaitingList: true,
+      showInCallList: true,
       showOfflineList: true,
-      showOnlineList: true,
-      embedColorOnline: "#57F287",
-      embedColorOffline: "#ED4245",
+      embedColorWaiting: "#57F287",
+      embedColorInCall: "#FEE75C",
+      embedColorOffline: "#99AAB5",
       embedColorSummary: "#5865F2",
       quietHoursStart: null,
       quietHoursEnd: null,
       pingOnStatusChange: true,
       statusChangeChannelId: null,
       maxHistoryEntries: 200,
-      offlineThresholdMinutes: null,
-      sortOnlineBy: "name",
-      sortOfflineBy: "name",
-      includeNoteInReport: true,
-      footerText: "X77live オンライン稼働管理",
+      sortBy: "name",
+      footerText: "X77live 大阪店 オンライン監視",
+      liveUrl: "https://x77.jp/live/?mode=online",
     },
     lastNotifyAt: null,
+    lastScrapeAt: null,
+    lastSummary: null,
   };
 }
 
@@ -79,9 +80,11 @@ export function loadConfig() {
       ...defaults,
       ...raw,
       settings: { ...defaults.settings, ...(raw.settings || {}) },
-      members: raw.members && typeof raw.members === "object" ? raw.members : {},
-      sessions:
-        raw.sessions && typeof raw.sessions === "object" ? raw.sessions : {},
+      boys: raw.boys && typeof raw.boys === "object" ? raw.boys : {},
+      boyStatuses:
+        raw.boyStatuses && typeof raw.boyStatuses === "object"
+          ? raw.boyStatuses
+          : {},
       history: Array.isArray(raw.history) ? raw.history : [],
       adminRoleIds: Array.isArray(raw.adminRoleIds)
         ? raw.adminRoleIds
@@ -97,25 +100,6 @@ export function saveConfig(config) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf8");
 }
 
-export function getMember(config, userId) {
-  return config.members[userId] || null;
-}
-
-export function getOrCreateMember(config, userId, displayName) {
-  if (!config.members[userId]) {
-    config.members[userId] = {
-      name: displayName,
-      displayName,
-      active: true,
-      addedAt: new Date().toISOString(),
-    };
-  } else if (displayName && config.members[userId].displayName !== displayName) {
-    config.members[userId].displayName = displayName;
-    config.members[userId].name = displayName;
-  }
-  return config.members[userId];
-}
-
 export function addHistory(config, entry) {
   config.history.push({
     ...entry,
@@ -127,55 +111,17 @@ export function addHistory(config, entry) {
   }
 }
 
-export function startSession(config, userId, note = "") {
-  config.sessions[userId] = {
-    startedAt: new Date().toISOString(),
-    note: note || "",
-  };
-  addHistory(config, {
-    type: "online_start",
-    userId,
-    note: note || "",
-  });
+export function getMonitoredBoys(config) {
+  return Object.entries(config.boyStatuses || {})
+    .map(([boyId, info]) => ({ boyId, ...info }))
+    .filter((b) => {
+      const meta = config.boys?.[b.boyId];
+      return !meta?.excluded;
+    });
 }
 
-export function endSession(config, userId) {
-  const session = config.sessions[userId];
-  if (!session) return null;
-
-  const endedAt = new Date().toISOString();
-  const durationMs =
-    new Date(endedAt).getTime() - new Date(session.startedAt).getTime();
-
-  addHistory(config, {
-    type: "online_end",
-    userId,
-    startedAt: session.startedAt,
-    endedAt,
-    durationMs,
-    note: session.note || "",
-  });
-
-  delete config.sessions[userId];
-  return { startedAt: session.startedAt, endedAt, durationMs };
-}
-
-export function isOnline(config, userId) {
-  return Boolean(config.sessions[userId]);
-}
-
-export function getActiveMembers(config) {
-  return Object.entries(config.members)
-    .filter(([, m]) => m.active)
-    .map(([id, m]) => ({ id, ...m }));
-}
-
-export function getOnlineMembers(config) {
-  return getActiveMembers(config).filter((m) => isOnline(config, m.id));
-}
-
-export function getOfflineMembers(config) {
-  return getActiveMembers(config).filter((m) => !isOnline(config, m.id));
+export function getBoysByStatus(config, status) {
+  return getMonitoredBoys(config).filter((b) => b.status === status);
 }
 
 export { DATA_DIR };

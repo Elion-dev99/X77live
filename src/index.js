@@ -7,16 +7,11 @@ import {
   Routes,
 } from "discord.js";
 import { buildSlashCommands, parseSlashInteraction } from "./slash-commands.js";
-import {
-  initCommands,
-  handleCommand,
-  getConfig,
-  persistConfig,
-  syncMembersFromRole,
-} from "./commands.js";
+import { initCommands, handleCommand, getConfig, persistConfig } from "./commands.js";
 import { buildStatusEmbed } from "./format.js";
 import { startHealthServer } from "./health.js";
 import { startNotifier, restartNotifier } from "./notifier.js";
+import { startMonitor } from "./monitor.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
@@ -37,10 +32,7 @@ console.log("[boot] PORT=", process.env.PORT || "(default 8080 for health)");
 startHealthServer();
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-  ],
+  intents: [GatewayIntentBits.Guilds],
 });
 
 async function registerSlashCommands() {
@@ -79,20 +71,18 @@ client.once(Events.ClientReady, async (c) => {
     initCommands(client);
 
     const config = getConfig();
-    console.log(`[boot] 店舗: ${config.storeName}`);
+    console.log(`[boot] 店舗: ${config.storeName} (shop_id=${config.shopId})`);
     console.log(
-      `[boot] 通知間隔: ${config.notifyIntervalMinutes}分 / 有効: ${config.notifyEnabled}`
+      `[boot] 監視間隔: ${config.pollIntervalMinutes}分 / 通知間隔: ${config.notifyIntervalMinutes}分`
     );
     console.log(
       `[boot] 通知チャンネル: ${config.notifyChannelId || "未設定"}`
     );
 
+    startMonitor(client, getConfig, persistConfig);
+
     if (config.notifyEnabled) {
       startNotifier(client, getConfig, persistConfig, buildStatusEmbed);
-    }
-
-    for (const [, guild] of client.guilds.cache) {
-      await syncMembersFromRole(guild, config);
     }
   } catch (err) {
     console.error("[warn] 起動後処理エラー（Bot本体は稼働中）:", err);
@@ -110,24 +100,6 @@ process.on("uncaughtException", (err) => {
 
 client.on("error", (err) => console.error("[discord] error:", err));
 client.on("warn", (msg) => console.warn("[discord] warn:", msg));
-
-client.on(Events.GuildMemberAdd, async (member) => {
-  const config = getConfig();
-  if (
-    config.memberRoleId &&
-    member.roles.cache.has(config.memberRoleId)
-  ) {
-    const { getOrCreateMember, addHistory } = await import("./store.js");
-    getOrCreateMember(
-      config,
-      member.id,
-      member.displayName || member.user.username
-    );
-    addHistory(config, { type: "member_add", userId: member.id });
-    persistConfig();
-    console.log(`[sync] 新メンバー自動登録: ${member.displayName}`);
-  }
-});
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
@@ -148,6 +120,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         content: "⚠️ 処理結果がありません。",
         ephemeral: true,
       });
+      return;
+    }
+
+    if (result.type === "deferred") {
+      const opts = {
+        allowedMentions: { parse: [] },
+        content: result.content,
+      };
+      if (result.embed) opts.embeds = [result.embed];
+      await result.interaction.editReply(opts);
       return;
     }
 
@@ -184,8 +166,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.login(token).catch((err) => {
   console.error("[fatal] Discord ログイン失敗:", err.message);
-  console.error(
-    "DISCORD_TOKEN が無効か期限切れです。Developer Portal で Reset Token 後、Railway Variables を更新してください。"
-  );
   process.exit(1);
 });

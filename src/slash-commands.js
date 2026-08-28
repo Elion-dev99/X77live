@@ -6,30 +6,20 @@ import {
 export function buildSlashCommands() {
   return [
     new SlashCommandBuilder()
-      .setName("オンライン開始")
-      .setDescription("オンライン稼働を開始します")
-      .addStringOption((opt) =>
-        opt
-          .setName("メモ")
-          .setDescription("任意のメモ（例: 配信A、夜勤など）")
-          .setRequired(false)
-      ),
-
-    new SlashCommandBuilder()
-      .setName("オンライン終了")
-      .setDescription("オンライン稼働を終了します"),
-
-    new SlashCommandBuilder()
       .setName("状況")
-      .setDescription("現在のオンライン稼働状況を表示します"),
+      .setDescription("大阪店ボーイの現在のオンライン稼働状況を表示"),
 
     new SlashCommandBuilder()
-      .setName("在籍一覧")
-      .setDescription("大阪店在籍メンバー一覧を表示します"),
+      .setName("一覧")
+      .setDescription("大阪店ボーイ全員のステータス一覧"),
+
+    new SlashCommandBuilder()
+      .setName("更新")
+      .setDescription("x77.jp から最新の稼働状況を即時取得"),
 
     new SlashCommandBuilder()
       .setName("履歴")
-      .setDescription("最近のオンライン開始/終了履歴を表示します")
+      .setDescription("最近のステータス変更履歴")
       .addIntegerOption((opt) =>
         opt
           .setName("件数")
@@ -40,35 +30,30 @@ export function buildSlashCommands() {
       ),
 
     new SlashCommandBuilder()
-      .setName("メンバー登録")
-      .setDescription("在籍メンバーを登録します（管理者）")
-      .addUserOption((opt) =>
-        opt.setName("ユーザー").setDescription("登録するユーザー").setRequired(true)
-      )
+      .setName("監視除外")
+      .setDescription("指定ボーイを監視対象から除外（管理者）")
       .addStringOption((opt) =>
         opt
-          .setName("表示名")
-          .setDescription("表示名（省略時はDiscord名）")
-          .setRequired(false)
+          .setName("boy_id")
+          .setDescription("除外する boy_id（/一覧 で確認）")
+          .setRequired(true)
       )
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     new SlashCommandBuilder()
-      .setName("メンバー削除")
-      .setDescription("在籍メンバーを削除します（管理者）")
-      .addUserOption((opt) =>
-        opt.setName("ユーザー").setDescription("削除するユーザー").setRequired(true)
+      .setName("監視再開")
+      .setDescription("除外したボーイを監視対象に戻す（管理者）")
+      .addStringOption((opt) =>
+        opt
+          .setName("boy_id")
+          .setDescription("再開する boy_id")
+          .setRequired(true)
       )
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
-
-    new SlashCommandBuilder()
-      .setName("ロール同期")
-      .setDescription("在籍ロールのメンバーを自動登録します（管理者）")
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     new SlashCommandBuilder()
       .setName("設定")
-      .setDescription("Bot設定を変更します（管理者）")
+      .setDescription("Bot設定を変更（管理者）")
       .addStringOption((opt) =>
         opt
           .setName("項目")
@@ -76,52 +61,42 @@ export function buildSlashCommands() {
           .setRequired(true)
           .addChoices(
             { name: "店舗名", value: "storeName" },
+            { name: "店舗ID (shop_id)", value: "shopId" },
             { name: "通知チャンネル", value: "notifyChannel" },
             { name: "通知間隔（分）", value: "notifyInterval" },
+            { name: "監視間隔（分）", value: "pollInterval" },
             { name: "定期通知 ON/OFF", value: "notifyEnabled" },
-            { name: "在籍ロール", value: "memberRole" },
             { name: "メンションロール", value: "mentionRole" },
-            { name: "オフライン者メンション", value: "mentionOffline" },
-            { name: "稼働時間表示", value: "showDuration" },
-            { name: "オンライン一覧表示", value: "showOnlineList" },
-            { name: "未稼働一覧表示", value: "showOfflineList" },
-            { name: "メモ表示", value: "includeNote" },
+            { name: "待機中一覧表示", value: "showWaiting" },
+            { name: "通話中一覧表示", value: "showInCall" },
+            { name: "オフライン一覧表示", value: "showOffline" },
             { name: "ステータス変更通知", value: "pingOnChange" },
             { name: "通知停止開始時刻", value: "quietStart" },
             { name: "通知停止終了時刻", value: "quietEnd" },
             { name: "フッターテキスト", value: "footerText" },
-            { name: "オンライン並び順", value: "sortOnline" },
-            { name: "未稼働並び順", value: "sortOffline" }
+            { name: "並び順", value: "sortBy" }
           )
       )
       .addStringOption((opt) =>
         opt
           .setName("値")
-          .setDescription("設定値（true/false、数値、テキスト、HH:MM 等）")
+          .setDescription("設定値")
           .setRequired(true)
       )
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     new SlashCommandBuilder()
       .setName("設定確認")
-      .setDescription("現在のBot設定を表示します"),
+      .setDescription("現在のBot設定を表示"),
 
     new SlashCommandBuilder()
       .setName("通知テスト")
-      .setDescription("定期通知のプレビューを送信します（管理者）")
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
-
-    new SlashCommandBuilder()
-      .setName("強制終了")
-      .setDescription("指定メンバーのオンラインを強制終了します（管理者）")
-      .addUserOption((opt) =>
-        opt.setName("ユーザー").setDescription("対象ユーザー").setRequired(true)
-      )
+      .setDescription("最新データ取得 + 定期通知プレビュー（管理者）")
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     new SlashCommandBuilder()
       .setName("ヘルプ")
-      .setDescription("コマンド一覧と使い方を表示します"),
+      .setDescription("コマンド一覧と使い方"),
   ].map((cmd) => cmd.toJSON());
 }
 
@@ -129,32 +104,27 @@ export function parseSlashInteraction(interaction) {
   const name = interaction.commandName;
 
   switch (name) {
-    case "オンライン開始":
-      return { command: "start", note: interaction.options.getString("メモ") || "" };
-    case "オンライン終了":
-      return { command: "stop" };
     case "状況":
       return { command: "status" };
-    case "在籍一覧":
+    case "一覧":
       return { command: "members" };
+    case "更新":
+      return { command: "refresh" };
     case "履歴":
       return {
         command: "history",
         limit: interaction.options.getInteger("件数") || 10,
       };
-    case "メンバー登録":
+    case "監視除外":
       return {
-        command: "add_member",
-        user: interaction.options.getUser("ユーザー"),
-        displayName: interaction.options.getString("表示名"),
+        command: "exclude_boy",
+        boyId: interaction.options.getString("boy_id"),
       };
-    case "メンバー削除":
+    case "監視再開":
       return {
-        command: "remove_member",
-        user: interaction.options.getUser("ユーザー"),
+        command: "include_boy",
+        boyId: interaction.options.getString("boy_id"),
       };
-    case "ロール同期":
-      return { command: "sync_roles" };
     case "設定":
       return {
         command: "setting",
@@ -165,11 +135,6 @@ export function parseSlashInteraction(interaction) {
       return { command: "settings_show" };
     case "通知テスト":
       return { command: "notify_test" };
-    case "強制終了":
-      return {
-        command: "force_stop",
-        user: interaction.options.getUser("ユーザー"),
-      };
     case "ヘルプ":
       return { command: "help" };
     default:

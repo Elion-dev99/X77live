@@ -102,12 +102,7 @@ function buildAllowedMentions(config) {
   return mentions;
 }
 
-export async function sendStatusChangeNotification(
-  client,
-  config,
-  message,
-  userId
-) {
+export async function sendStatusChangeNotification(client, config, message) {
   if (!config.settings.pingOnStatusChange) return;
 
   const channelId =

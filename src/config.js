@@ -31,22 +31,30 @@ export function isAdmin(member, config) {
 
 export const SETTING_KEYS = {
   storeName: { type: "string", path: "storeName" },
+  shopId: { type: "string", path: "shopId" },
   notifyChannel: { type: "channel", path: "notifyChannelId" },
-  notifyInterval: { type: "number", path: "notifyIntervalMinutes", min: 1, max: 1440 },
+  notifyInterval: {
+    type: "number",
+    path: "notifyIntervalMinutes",
+    min: 1,
+    max: 1440,
+  },
+  pollInterval: {
+    type: "number",
+    path: "pollIntervalMinutes",
+    min: 1,
+    max: 60,
+  },
   notifyEnabled: { type: "boolean", path: "notifyEnabled" },
-  memberRole: { type: "role", path: "memberRoleId" },
   mentionRole: { type: "role", path: "mentionRoleId" },
-  mentionOffline: { type: "boolean", path: "mentionOffline" },
-  showDuration: { type: "boolean", path: "settings.showDuration" },
-  showOnlineList: { type: "boolean", path: "settings.showOnlineList" },
-  showOfflineList: { type: "boolean", path: "settings.showOfflineList" },
-  includeNote: { type: "boolean", path: "settings.includeNoteInReport" },
+  showWaiting: { type: "boolean", path: "settings.showWaitingList" },
+  showInCall: { type: "boolean", path: "settings.showInCallList" },
+  showOffline: { type: "boolean", path: "settings.showOfflineList" },
   pingOnChange: { type: "boolean", path: "settings.pingOnStatusChange" },
   quietStart: { type: "time", path: "settings.quietHoursStart" },
   quietEnd: { type: "time", path: "settings.quietHoursEnd" },
   footerText: { type: "string", path: "settings.footerText" },
-  sortOnline: { type: "enum", path: "settings.sortOnlineBy", values: ["name", "duration", "recent"] },
-  sortOffline: { type: "enum", path: "settings.sortOfflineBy", values: ["name", "recent"] },
+  sortBy: { type: "enum", path: "settings.sortBy", values: ["name", "status"] },
 };
 
 export function getNestedValue(obj, dotPath) {
@@ -71,7 +79,10 @@ export function applySetting(config, key, value) {
     case "number": {
       const num = Number(value);
       if (isNaN(num) || num < def.min || num > def.max) {
-        return { ok: false, error: `${def.min}〜${def.max} の数値を指定してください` };
+        return {
+          ok: false,
+          error: `${def.min}〜${def.max} の数値を指定してください`,
+        };
       }
       setNestedValue(config, def.path, num);
       break;

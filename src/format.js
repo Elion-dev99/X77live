@@ -1,179 +1,136 @@
 import { EmbedBuilder } from "discord.js";
-import {
-  getActiveMembers,
-  getOnlineMembers,
-  getOfflineMembers,
-  isOnline,
-} from "./store.js";
+import { getMonitoredBoys, getBoysByStatus } from "./store.js";
+import { STATUS } from "./scraper.js";
 
-function formatDuration(ms) {
-  if (!ms || ms < 0) return "0分";
-  const totalMinutes = Math.floor(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours > 0) return `${hours}時間${minutes}分`;
-  return `${minutes}分`;
-}
-
-function formatDurationSince(isoDate) {
-  if (!isoDate) return "";
-  const ms = Date.now() - new Date(isoDate).getTime();
-  return formatDuration(ms);
-}
-
-function sortMembers(members, sortBy) {
-  const sorted = [...members];
-  switch (sortBy) {
-    case "duration":
-      sorted.sort((a, b) => {
-        const aStart = a.session?.startedAt || "";
-        const bStart = b.session?.startedAt || "";
-        return aStart.localeCompare(bStart);
-      });
-      break;
-    case "recent":
-      sorted.sort((a, b) => {
-        const aAdded = a.addedAt || "";
-        const bAdded = b.addedAt || "";
-        return bAdded.localeCompare(aAdded);
-      });
-      break;
-    case "name":
-    default:
-      sorted.sort((a, b) =>
-        (a.displayName || a.name || "").localeCompare(
-          b.displayName || b.name || "",
-          "ja"
-        )
-      );
-      break;
+function sortBoys(boys, sortBy) {
+  const sorted = [...boys];
+  if (sortBy === "status") {
+    const order = { [STATUS.IN_CALL]: 0, [STATUS.WAITING]: 1, [STATUS.OFFLINE]: 2 };
+    sorted.sort(
+      (a, b) =>
+        (order[a.status] ?? 9) - (order[b.status] ?? 9) ||
+        a.name.localeCompare(b.name, "ja")
+    );
+  } else {
+    sorted.sort((a, b) => a.name.localeCompare(b.name, "ja"));
   }
   return sorted;
 }
 
-function memberLine(member, config, session) {
-  const name = member.displayName || member.name || "不明";
-  const parts = [`**${name}**`];
+function boyLine(boy) {
+  const liveTag = boy.liveName && boy.liveName !== boy.name ? ` (${boy.liveName})` : "";
+  return `**${boy.name}**${liveTag}`;
+}
 
-  if (config.settings.showDuration && session?.startedAt) {
-    parts.push(`(${formatDurationSince(session.startedAt)})`);
-  }
-
-  if (config.settings.includeNoteInReport && session?.note) {
-    parts.push(`— ${session.note}`);
-  }
-
-  return parts.join(" ");
+function fieldValue(boys, emptyText) {
+  if (boys.length === 0) return emptyText;
+  return boys.map(boyLine).join("\n").slice(0, 1024);
 }
 
 export function buildStatusEmbed(config) {
-  const onlineRaw = getOnlineMembers(config).map((m) => ({
-    ...m,
-    session: config.sessions[m.id],
-  }));
-  const offlineRaw = getOfflineMembers(config);
+  const all = sortBoys(getMonitoredBoys(config), config.settings.sortBy);
+  const waiting = all.filter((b) => b.status === STATUS.WAITING);
+  const inCall = all.filter((b) => b.status === STATUS.IN_CALL);
+  const offline = all.filter((b) => b.status === STATUS.OFFLINE);
 
-  const online = sortMembers(onlineRaw, config.settings.sortOnlineBy);
-  const offline = sortMembers(offlineRaw, config.settings.sortOfflineBy);
-
-  const total = getActiveMembers(config).length;
-  const onlineCount = online.length;
-  const offlineCount = offline.length;
-
-  const color =
-    onlineCount === 0
-      ? config.settings.embedColorOffline
-      : offlineCount === 0
-        ? config.settings.embedColorOnline
-        : config.settings.embedColorSummary;
+  const summary = config.lastSummary || {
+    total: all.length,
+    waiting: waiting.length,
+    inCall: inCall.length,
+    offline: offline.length,
+  };
 
   const embed = new EmbedBuilder()
     .setTitle(`📡 ${config.storeName} — オンライン稼働状況`)
-    .setColor(color)
+    .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
-  const summary = [
-    `👥 在籍: **${total}** 名`,
-    `🟢 オンライン中: **${onlineCount}** 名`,
-    `⚪ 未稼働: **${offlineCount}** 名`,
+  const desc = [
+    `👥 監視対象: **${summary.total}** 名`,
+    `🟢 待機中: **${summary.waiting}** 名`,
+    `📞 通話中: **${summary.inCall}** 名`,
+    `⚪ オフライン: **${summary.offline}** 名`,
   ].join("  |  ");
-  embed.setDescription(summary);
+  embed.setDescription(desc);
 
-  if (config.settings.showOnlineList) {
-    if (online.length > 0) {
-      const lines = online.map((m) => memberLine(m, config, m.session));
-      embed.addFields({
-        name: `🟢 オンライン中 (${onlineCount})`,
-        value: lines.join("\n").slice(0, 1024),
-      });
-    } else {
-      embed.addFields({
-        name: "🟢 オンライン中 (0)",
-        value: "_現在オンライン中のメンバーはいません_",
-      });
-    }
+  if (config.settings.showInCallList) {
+    embed.addFields({
+      name: `📞 通話中 (${inCall.length})`,
+      value: fieldValue(inCall, "_通話中のボーイはいません_"),
+    });
+  }
+
+  if (config.settings.showWaitingList) {
+    embed.addFields({
+      name: `🟢 待機中 (${waiting.length})`,
+      value: fieldValue(waiting, "_待機中のボーイはいません_"),
+    });
   }
 
   if (config.settings.showOfflineList) {
-    if (offline.length > 0) {
-      const lines = offline.map((m) => {
-        const name = m.displayName || m.name || "不明";
-        return `**${name}**`;
-      });
-      embed.addFields({
-        name: `⚪ 未稼働 (${offlineCount})`,
-        value: lines.join("\n").slice(0, 1024),
-      });
-    } else {
-      embed.addFields({
-        name: "⚪ 未稼働 (0)",
-        value: "_全員オンライン中です！_",
-      });
-    }
+    embed.addFields({
+      name: `⚪ オフライン (${offline.length})`,
+      value: fieldValue(offline, "_全員オンライン中です_"),
+    });
   }
 
-  if (config.settings.footerText) {
+  if (config.lastScrapeAt) {
+    const t = new Date(config.lastScrapeAt).toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    embed.setFooter({
+      text: `${config.settings.footerText} | 最終更新 ${t}`,
+    });
+  } else if (config.settings.footerText) {
     embed.setFooter({ text: config.settings.footerText });
+  }
+
+  if (config.settings.liveUrl) {
+    embed.setURL(config.settings.liveUrl);
   }
 
   return embed;
 }
 
-export function buildStatusChangeMessage(config, userId, action, memberName) {
-  const name = memberName || "不明";
-  if (action === "start") {
-    return `🟢 **${name}** がオンラインを開始しました`;
-  }
-  if (action === "end") {
-    return `⚪ **${name}** がオンラインを終了しました`;
-  }
-  return null;
+/**
+ * @param {{ name: string, from: string, to: string }} change
+ */
+export function buildBoyStatusChangeMessage(change) {
+  const icon = {
+    [STATUS.WAITING]: "🟢",
+    [STATUS.IN_CALL]: "📞",
+    [STATUS.OFFLINE]: "⚪",
+  };
+  return `${icon[change.to] || "🔔"} **${change.name}**: ${change.from} → **${change.to}**`;
 }
 
 export function buildMemberListEmbed(config) {
-  const members = getActiveMembers(config);
+  const boys = sortBoys(getMonitoredBoys(config), "name");
   const embed = new EmbedBuilder()
-    .setTitle(`👥 ${config.storeName} — 在籍メンバー一覧`)
+    .setTitle(`👥 ${config.storeName} — ボーイ一覧`)
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
-  if (members.length === 0) {
-    embed.setDescription("_在籍メンバーが登録されていません_");
+  if (boys.length === 0) {
+    embed.setDescription(
+      "_まだデータがありません。`/更新` で x77.jp から取得してください。_"
+    );
     return embed;
   }
 
-  const sorted = sortMembers(members, "name");
-  const lines = sorted.map((m) => {
-    const status = isOnline(config, m.id) ? "🟢" : "⚪";
-    const duration =
-      isOnline(config, m.id) && config.settings.showDuration
-        ? ` (${formatDurationSince(config.sessions[m.id]?.startedAt)})`
-        : "";
-    return `${status} **${m.displayName || m.name}**${duration}`;
-  });
+  const icon = {
+    [STATUS.WAITING]: "🟢",
+    [STATUS.IN_CALL]: "📞",
+    [STATUS.OFFLINE]: "⚪",
+  };
 
-  embed.setDescription(lines.join("\n"));
-  embed.setFooter({ text: `合計 ${members.length} 名` });
+  const lines = boys.map(
+    (b) => `${icon[b.status] || "❓"} **${b.name}** — ${b.status}`
+  );
+  embed.setDescription(lines.join("\n").slice(0, 4000));
+  embed.setFooter({ text: `合計 ${boys.length} 名` });
   return embed;
 }
 
@@ -183,8 +140,14 @@ export function buildSettingsEmbed(config) {
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
-  const fields = [
+  embed.addFields(
     { name: "店舗名", value: config.storeName, inline: true },
+    { name: "店舗ID (shop_id)", value: config.shopId || "4", inline: true },
+    {
+      name: "監視間隔",
+      value: `${config.pollIntervalMinutes || 2} 分`,
+      inline: true,
+    },
     {
       name: "通知間隔",
       value: `${config.notifyIntervalMinutes} 分`,
@@ -201,45 +164,38 @@ export function buildSettingsEmbed(config) {
       inline: true,
     },
     {
-      name: "在籍ロール",
-      value: config.memberRoleId ? `<@&${config.memberRoleId}>` : "未設定",
-      inline: true,
-    },
-    {
       name: "ステータス変更通知",
       value: config.settings.pingOnStatusChange ? "✅ 有効" : "❌ 無効",
       inline: true,
     },
     {
-      name: "表示オプション",
+      name: "表示項目",
       value: [
-        config.settings.showOnlineList ? "オンライン一覧" : null,
-        config.settings.showOfflineList ? "未稼働一覧" : null,
-        config.settings.showDuration ? "稼働時間" : null,
-        config.settings.includeNoteInReport ? "メモ表示" : null,
+        config.settings.showWaitingList ? "待機中" : null,
+        config.settings.showInCallList ? "通話中" : null,
+        config.settings.showOfflineList ? "オフライン" : null,
       ]
         .filter(Boolean)
         .join(" / ") || "なし",
       inline: false,
-    },
-  ];
+    }
+  );
 
   if (config.settings.quietHoursStart && config.settings.quietHoursEnd) {
-    fields.push({
+    embed.addFields({
       name: "通知停止時間帯",
       value: `${config.settings.quietHoursStart} 〜 ${config.settings.quietHoursEnd}`,
       inline: true,
     });
   }
 
-  embed.addFields(fields);
   return embed;
 }
 
 export function buildHistoryEmbed(config, limit = 10) {
   const recent = config.history.slice(-limit).reverse();
   const embed = new EmbedBuilder()
-    .setTitle("📋 最近の履歴")
+    .setTitle("📋 最近のステータス変更")
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
@@ -249,8 +205,6 @@ export function buildHistoryEmbed(config, limit = 10) {
   }
 
   const lines = recent.map((entry) => {
-    const member = config.members[entry.userId];
-    const name = member?.displayName || member?.name || entry.userId;
     const time = new Date(entry.at).toLocaleString("ja-JP", {
       timeZone: "Asia/Tokyo",
       month: "numeric",
@@ -259,22 +213,18 @@ export function buildHistoryEmbed(config, limit = 10) {
       minute: "2-digit",
     });
 
-    switch (entry.type) {
-      case "online_start":
-        return `\`${time}\` 🟢 **${name}** 開始${entry.note ? ` — ${entry.note}` : ""}`;
-      case "online_end":
-        return `\`${time}\` ⚪ **${name}** 終了 (${formatDuration(entry.durationMs)})`;
-      case "member_add":
-        return `\`${time}\` ➕ **${name}** 登録`;
-      case "member_remove":
-        return `\`${time}\` ➖ **${name}** 削除`;
-      default:
-        return `\`${time}\` ${entry.type}`;
+    if (entry.type === "status_change") {
+      return `\`${time}\` **${entry.name}**: ${entry.from} → ${entry.to}`;
     }
+    if (entry.type === "boy_exclude") {
+      return `\`${time}\` 🚫 **${entry.name}** 監視除外`;
+    }
+    if (entry.type === "boy_include") {
+      return `\`${time}\` ✅ **${entry.name}** 監視再開`;
+    }
+    return `\`${time}\` ${entry.type}`;
   });
 
   embed.setDescription(lines.join("\n"));
   return embed;
 }
-
-export { formatDuration, formatDurationSince };
