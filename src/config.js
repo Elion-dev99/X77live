@@ -55,6 +55,12 @@ export const SETTING_KEYS = {
   quietEnd: { type: "time", path: "settings.quietHoursEnd" },
   footerText: { type: "string", path: "settings.footerText" },
   sortBy: { type: "enum", path: "settings.sortBy", values: ["name", "status"] },
+  sessionHours: {
+    type: "number",
+    path: "auth.sessionHours",
+    min: 1,
+    max: 168,
+  },
 };
 
 export function getNestedValue(obj, dotPath) {
