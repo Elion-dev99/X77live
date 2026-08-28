@@ -1,5 +1,8 @@
 node_modules/
 data/
 .env
+.env.sftp
+sftp.env
+downloads/
 *.log
 .DS_Store
