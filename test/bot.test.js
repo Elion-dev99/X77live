@@ -8,15 +8,18 @@ import { buildStatusEmbed, buildBoyStatusChangeMessage } from "../src/format.js"
 import {
   parseLivePage,
   parseRosterPage,
+  parseLiverListTotal,
+  buildLiverListUrl,
   mergeOsakaStatuses,
   STATUS,
 } from "../src/scraper.js";
 
 const FIXTURE_LIVE = path.join("test", "fixtures", "live-online.html");
+const FIXTURE_LIVER_LIST = path.join("test", "fixtures", "twoshot-liverlist.html");
 const FIXTURE_ROSTER = path.join("test", "fixtures", "osaka-roster.html");
 
 describe("scraper", () => {
-  it("parseLivePage extracts boy statuses", () => {
+  it("parseLivePage extracts boy statuses from online list", () => {
     if (!fs.existsSync(FIXTURE_LIVE)) {
       console.log("skip: fixture not found");
       return;
@@ -26,6 +29,34 @@ describe("scraper", () => {
     assert.ok(online.size > 0);
     assert.ok([...online.values()].some((b) => b.status === STATUS.WAITING));
     assert.ok([...online.values()].some((b) => b.status === STATUS.IN_CALL));
+  });
+
+  it("parseLivePage marks offline boys on twoshot liver list", () => {
+    if (!fs.existsSync(FIXTURE_LIVER_LIST)) {
+      console.log("skip: fixture not found");
+      return;
+    }
+    const html = fs.readFileSync(FIXTURE_LIVER_LIST, "utf8");
+    const statuses = parseLivePage(html);
+    assert.ok(statuses.size > 10);
+    assert.ok([...statuses.values()].some((b) => b.status === STATUS.WAITING));
+    assert.ok([...statuses.values()].some((b) => b.status === STATUS.OFFLINE));
+    assert.equal(statuses.get("13187")?.status, STATUS.OFFLINE);
+    assert.equal(statuses.get("12281")?.status, STATUS.WAITING);
+  });
+
+  it("parseLiverListTotal reads total count", () => {
+    if (!fs.existsSync(FIXTURE_LIVER_LIST)) {
+      console.log("skip: fixture not found");
+      return;
+    }
+    const html = fs.readFileSync(FIXTURE_LIVER_LIST, "utf8");
+    assert.equal(parseLiverListTotal(html), 133);
+  });
+
+  it("buildLiverListUrl includes pagination params", () => {
+    assert.ok(buildLiverListUrl(1).includes("search_page_max=50"));
+    assert.ok(buildLiverListUrl(2).includes("search_pageno=2"));
   });
 
   it("parseRosterPage extracts boy ids", () => {

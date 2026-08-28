@@ -1,19 +1,19 @@
 # X77live 大阪店 オンライン監視 Bot
 
-[x77.jp/live/?mode=online](https://x77.jp/live/?mode=online) から **大阪店ボーイのみ** の稼働状況を自動監視し、Discord に定期通知する Bot です。
+[x77.jp/live/twoshot_liverlist.php](https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2) から **関西エリア所属ライバー（大阪店）** の稼働状況を自動監視し、Discord に定期通知する Bot です。
 
 ## 監視ステータス
 
 | ステータス | 意味 | 取得方法 |
 |-----------|------|---------|
-| 🟢 **待機中** | オンラインで待機中 | x77.jp 2ショットページに表示 |
-| 📞 **通話中** | 2ショット通話中 | x77.jp 2ショットページに表示 |
-| ⚪ **オフライン** | オンライン未接続 | 大阪店ロスターにいるがページに未表示 |
+| 🟢 **待機中** | オンラインで待機中 | `live_situation02` 表示 |
+| 📞 **通話中** | 2ショット通話中 | `live_situation01` 表示 |
+| ⚪ **オフライン** | オンライン未接続 | ライバーリストに表示あるが上記なし |
 
 ## データソース
 
 - **ロスター（在籍ボーイ一覧）**: `dgdgdg.com/boy/list.php?shop_id=4`（大阪店）
-- **稼働状況**: `x77.jp/live/?mode=online`（2ショットページ）
+- **稼働状況**: `x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2`（関西エリア所属ライバー）
 
 ## コマンド
 

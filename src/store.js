@@ -65,7 +65,8 @@ export function defaultConfig() {
       maxHistoryEntries: 200,
       sortBy: "name",
       footerText: "X77live 大阪店 オンライン監視",
-      liveUrl: "https://x77.jp/live/?mode=online",
+      liveUrl:
+        "https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2",
     },
     lastNotifyAt: null,
     lastScrapeAt: null,

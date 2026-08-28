@@ -5,9 +5,11 @@
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-const LIVE_URL = "https://x77.jp/live/?mode=online";
+const LIVER_LIST_BASE =
+  "https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2";
 const AGE_VERIFY_URL = "https://x77.jp/?mode=1";
 const ROSTER_URL = "https://www.dgdgdg.com/boy/list.php";
+const LIVER_LIST_PAGE_SIZE = 50;
 
 /** @type {Map<string, string>} */
 const sessionCookies = new Map();
@@ -91,7 +93,7 @@ async function ensureSession() {
   }
 
   const res = await fetch(
-    `${AGE_VERIFY_URL}&ref=${encodeURIComponent(LIVE_URL)}`,
+    `${AGE_VERIFY_URL}&ref=${encodeURIComponent(LIVER_LIST_BASE)}`,
     { headers, redirect: "manual" }
   );
 
@@ -107,11 +109,34 @@ async function ensureSession() {
 
 /**
  * @param {string} html
+ * @returns {number}
+ */
+export function parseLiverListTotal(html) {
+  const match = html.match(/全(\d+)件中/);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+/**
+ * @param {number} [pageNo]
+ * @returns {string}
+ */
+export function buildLiverListUrl(pageNo = 1) {
+  const url = new URL(LIVER_LIST_BASE);
+  url.searchParams.set("search_page_max", String(LIVER_LIST_PAGE_SIZE));
+  if (pageNo > 1) {
+    url.searchParams.set("search_pageno", String(pageNo));
+  }
+  return url.toString();
+}
+
+/**
+ * twoshot_liverlist.php から待機中・通話中・オフラインを判定
+ * @param {string} html
  * @returns {Map<string, { boyId: string, name: string, status: string }>}
  */
 export function parseLivePage(html) {
   /** @type {Map<string, { boyId: string, name: string, status: string }>} */
-  const online = new Map();
+  const statuses = new Map();
 
   const blocks = html.match(/<li>[\s\S]*?<\/li>/g) || [];
   for (const block of blocks) {
@@ -122,22 +147,21 @@ export function parseLivePage(html) {
     const nameMatch = block.match(/<div class="liveinfo">[\s\S]*?<p>\s*([^<\n]+)/);
     const name = nameMatch ? nameMatch[1].trim() : "不明";
 
-    let status = STATUS.WAITING;
+    let status = STATUS.OFFLINE;
     if (block.includes("live_situation01")) {
       status = STATUS.IN_CALL;
     } else if (block.includes("live_situation02")) {
       const textMatch = block.match(
         /live_situation02">\s*(?:<a[^>]*>\s*)?([^<\n]+)/
       );
-      status = textMatch ? textMatch[1].trim() : STATUS.WAITING;
-    } else {
-      continue;
+      const label = textMatch ? textMatch[1].trim() : STATUS.WAITING;
+      status = label.includes("通話") ? STATUS.IN_CALL : STATUS.WAITING;
     }
 
-    online.set(boyId, { boyId, name, status });
+    statuses.set(boyId, { boyId, name, status });
   }
 
-  return online;
+  return statuses;
 }
 
 /**
@@ -201,18 +225,32 @@ export async function fetchRoster(shopId) {
   return parseRosterPage(html);
 }
 
+async function fetchLiverListHtml(pageNo = 1) {
+  return fetchPage(buildLiverListUrl(pageNo));
+}
+
 export async function fetchLiveOnline() {
   await ensureSession();
-  const html = await fetchPage(LIVE_URL);
+  let html = await fetchLiverListHtml(1);
 
-  if (html.includes("年齢認証") && !html.includes("liver_list")) {
+  if (html.includes("年齢認証") && !html.includes("fvliver_list_top")) {
     sessionCookies.clear();
     await ensureSession();
-    const retryHtml = await fetchPage(LIVE_URL);
-    return parseLivePage(retryHtml);
+    html = await fetchLiverListHtml(1);
   }
 
-  return parseLivePage(html);
+  const statuses = parseLivePage(html);
+  const total = parseLiverListTotal(html);
+  const totalPages = Math.max(1, Math.ceil(total / LIVER_LIST_PAGE_SIZE));
+
+  for (let pageNo = 2; pageNo <= totalPages; pageNo++) {
+    const pageHtml = await fetchLiverListHtml(pageNo);
+    for (const [boyId, boy] of parseLivePage(pageHtml)) {
+      statuses.set(boyId, boy);
+    }
+  }
+
+  return statuses;
 }
 
 /**
