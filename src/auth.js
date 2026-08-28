@@ -10,6 +10,7 @@ export const ADMIN_COMMANDS = new Set([
   "change_password",
   "refresh",
   "history",
+  "restart_server",
 ]);
 
 /** @deprecated ADMIN_COMMANDS を使用してください */

@@ -107,6 +107,7 @@ describe("auth", () => {
   it("ADMIN_COMMANDS includes refresh and history", () => {
     assert.ok(ADMIN_COMMANDS.has("refresh"));
     assert.ok(ADMIN_COMMANDS.has("history"));
+    assert.ok(ADMIN_COMMANDS.has("restart_server"));
     assert.ok(ADMIN_COMMANDS.has("setting"));
     assert.ok(!ADMIN_COMMANDS.has("status"));
     assert.ok(!ADMIN_COMMANDS.has("members"));
@@ -116,7 +117,7 @@ describe("auth", () => {
 describe("slash-commands auth options", () => {
   it("admin commands expose optional password option", () => {
     const commands = buildSlashCommands();
-    const adminNames = ["更新", "履歴", "設定", "設定確認", "通知テスト", "監視除外", "監視再開"];
+    const adminNames = ["更新", "履歴", "設定", "設定確認", "通知テスト", "監視除外", "監視再開", "再起動"];
 
     for (const name of adminNames) {
       const cmd = commands.find((c) => c.name === name);

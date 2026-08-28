@@ -334,6 +334,22 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
+    case "restart_server": {
+      addHistory(config, {
+        type: "bot_restart",
+        userId: interaction.user.id,
+        userTag: interaction.user.tag,
+      });
+      persistConfig();
+      return {
+        type: "restart",
+        content:
+          "🔄 Bot サーバーを再起動します。数十秒後にオンラインに戻ります。",
+        ephemeral: true,
+        reason: `user:${interaction.user.id}`,
+      };
+    }
+
     case "help":
       return {
         type: "text",
@@ -348,6 +364,7 @@ export async function handleCommand(interaction, parsed) {
           "• `/更新` `/履歴`",
           "• `/設定` `/設定確認` `/通知テスト`",
           "• `/監視除外` `/監視再開` `/パスワード変更`",
+          "• `/再起動` — Bot サーバー再起動",
           "• `/ログアウト` — セッション終了",
           "",
           "未ログイン時は各コマンドの `パスワード` オプションでも実行できます。",
