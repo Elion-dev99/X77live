@@ -27,14 +27,88 @@ function fieldValue(boys, emptyText) {
   return boys.map(boyLine).join("\n").slice(0, 1024);
 }
 
-export function buildStatusEmbed(config) {
+function getStatusGroups(config) {
   const all = sortBoys(getMonitoredBoys(config), config.settings.sortBy);
-  const waiting = all.filter((b) => b.status === STATUS.WAITING);
-  const inCall = all.filter((b) => b.status === STATUS.IN_CALL);
-  const offline = all.filter((b) => b.status === STATUS.OFFLINE);
+  return {
+    all,
+    waiting: all.filter((b) => b.status === STATUS.WAITING),
+    inCall: all.filter((b) => b.status === STATUS.IN_CALL),
+    offline: all.filter((b) => b.status === STATUS.OFFLINE),
+  };
+}
+
+/**
+ * 定期通知用: 待機中・通話中のみ表示
+ */
+export function buildNotificationEmbed(config) {
+  const { waiting, inCall } = getStatusGroups(config);
+  const onlineCount = waiting.length + inCall.length;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📡 ${config.storeName} — オンライン`)
+    .setColor(config.settings.embedColorSummary)
+    .setTimestamp(new Date());
+
+  const desc = [
+    `🟢 待機中: **${waiting.length}** 名`,
+    `📞 通話中: **${inCall.length}** 名`,
+  ].join("  |  ");
+  embed.setDescription(desc);
+
+  if (config.settings.showInCallList) {
+    embed.addFields({
+      name: `📞 通話中 (${inCall.length})`,
+      value: fieldValue(inCall, "_通話中のボーイはいません_"),
+    });
+  }
+
+  if (config.settings.showWaitingList) {
+    embed.addFields({
+      name: `🟢 待機中 (${waiting.length})`,
+      value: fieldValue(waiting, "_待機中のボーイはいません_"),
+    });
+  }
+
+  if (onlineCount === 0) {
+    embed.setDescription("_現在オンラインのボーイはいません_");
+  }
+
+  if (config.lastScrapeAt) {
+    const t = new Date(config.lastScrapeAt).toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    embed.setFooter({
+      text: `${config.settings.footerText} | 最終更新 ${t}`,
+    });
+  } else if (config.settings.footerText) {
+    embed.setFooter({ text: config.settings.footerText });
+  }
+
+  if (config.settings.liveUrl) {
+    embed.setURL(config.settings.liveUrl);
+  }
+
+  return embed;
+}
+
+export function getOnlineCount(config) {
+  const summary = config.lastSummary;
+  if (summary) return (summary.waiting || 0) + (summary.inCall || 0);
+  const { waiting, inCall } = getStatusGroups(config);
+  return waiting.length + inCall.length;
+}
+
+export function isOnlineStatus(status) {
+  return status === STATUS.WAITING || status === STATUS.IN_CALL;
+}
+
+export function buildStatusEmbed(config) {
+  const { waiting, inCall, offline } = getStatusGroups(config);
 
   const summary = config.lastSummary || {
-    total: all.length,
+    total: waiting.length + inCall.length + offline.length,
     waiting: waiting.length,
     inCall: inCall.length,
     offline: offline.length,
