@@ -91,6 +91,7 @@ export function defaultConfig() {
       dailySummaryEnabled: true,
       businessHoursOpen: process.env.BUSINESS_HOURS_OPEN?.trim() || "13:00",
       businessHoursClose: process.env.BUSINESS_HOURS_CLOSE?.trim() || "01:00",
+      monitorBusinessHoursOnly: process.env.MONITOR_BUSINESS_HOURS_ONLY !== "false",
       dailySummaryAt: process.env.DAILY_SUMMARY_AT?.trim() || "01:00",
       scrapeAlertEnabled: process.env.SCRAPE_ALERT_ENABLED !== "false",
       scrapeAlertThreshold: Number(process.env.SCRAPE_ALERT_THRESHOLD) || 3,
