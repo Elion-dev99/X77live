@@ -155,4 +155,26 @@ describe("format", () => {
     assert.ok(!fields.some((f) => f.name.includes("オフライン")));
     assert.equal(getOnlineCount(config), 2);
   });
+
+  it("buildNotificationEmbed includes scheduled-not-online from shift compare", () => {
+    const config = defaultConfig();
+    config.boyStatuses = {
+      "1": { name: "太郎", status: STATUS.WAITING, updatedAt: new Date().toISOString() },
+    };
+    config.lastSummary = { total: 1, waiting: 1, inCall: 0, offline: 0 };
+    config.lastShiftCompare = {
+      scheduledNotOnline: [
+        { boyId: "99999", name: "不在", shiftTime: "14:00～22:00", status: STATUS.OFFLINE },
+      ],
+      onlineNotScheduled: [],
+    };
+
+    const embed = buildNotificationEmbed(config);
+    const fields = embed.data.fields || [];
+    const missingField = fields.find((f) => f.name.includes("未オンライン"));
+    assert.ok(missingField);
+    assert.ok(missingField.value.includes("不在"));
+    assert.ok(missingField.value.includes("14:00～22:00"));
+    assert.ok(embed.data.description.includes("シフト未オンライン"));
+  });
 });
