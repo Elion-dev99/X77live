@@ -328,6 +328,55 @@ export function buildWeeklySummaryEmbed(config, weeklyStats) {
   return embed;
 }
 
+export function buildShiftCheckEmbed(config, result) {
+  const embed = new EmbedBuilder()
+    .setTitle(`📋 ${config.storeName} — シフト照合`)
+    .setColor(config.settings.embedColorSummary)
+    .setTimestamp(new Date());
+
+  const meta = [
+    `営業日: **${result.dateKey || "不明"}**`,
+    result.source ? `ソース: ${result.source}` : null,
+    `出勤シフト: **${result.scheduledCount ?? "-"}** 名`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  embed.setDescription(meta);
+
+  if (
+    result.scheduledNotOnline.length === 0 &&
+    result.onlineNotScheduled.length === 0
+  ) {
+    embed.addFields({
+      name: "結果",
+      value: "不一致はありません ✅",
+    });
+    return embed;
+  }
+
+  if (result.scheduledNotOnline.length > 0) {
+    const lines = result.scheduledNotOnline
+      .slice(0, 15)
+      .map((b) => `• **${b.name}** (${b.shiftTime}) — ${b.status}`);
+    embed.addFields({
+      name: `🚨 出勤なのに未オンライン (${result.scheduledNotOnline.length})`,
+      value: lines.join("\n").slice(0, 1024),
+    });
+  }
+
+  if (result.onlineNotScheduled.length > 0) {
+    const lines = result.onlineNotScheduled
+      .slice(0, 15)
+      .map((b) => `• **${b.name}** — ${b.status}`);
+    embed.addFields({
+      name: `⚠️ シフト外オンライン (${result.onlineNotScheduled.length})`,
+      value: lines.join("\n").slice(0, 1024),
+    });
+  }
+
+  return embed;
+}
+
 export function buildMemberListEmbed(config) {
   const boys = sortBoys(getMonitoredBoys(config), "name");
   const embed = new EmbedBuilder()

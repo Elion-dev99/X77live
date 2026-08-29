@@ -188,6 +188,11 @@ export function buildSlashCommands() {
       .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
+      .setName("出勤チェック")
+      .setDescription("今日のシフトとオンライン状態の不一致を確認")
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
       .setName("設定復元")
       .setDescription("config.json の最新バックアップから設定を復元")
       .addStringOption((opt) =>
@@ -297,6 +302,11 @@ export function parseSlashInteraction(interaction) {
       return {
         command: "restore_config",
         backupName: interaction.options.getString("バックアップ"),
+        password: getPassword(interaction),
+      };
+    case "出勤チェック":
+      return {
+        command: "shift_check",
         password: getPassword(interaction),
       };
     case "ヘルプ":

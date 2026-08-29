@@ -12,6 +12,9 @@ import {
   loadReportDocument,
   buildInterimReportFiles,
 } from "./daily-report-files.js";
+import { runShiftCheck } from "./shift-monitor.js";
+import { fetchTodayShift } from "./shift-scraper.js";
+import { compareShiftWithStatuses } from "./shift-compare.js";
 import {
   restoreConfigFromBackup,
   listConfigBackups,
@@ -24,6 +27,7 @@ import {
   buildHistoryEmbed,
   buildReportListEmbed,
   buildDailySummaryEmbed,
+  buildShiftCheckEmbed,
 } from "./format.js";
 import {
   sendPeriodicNotification,
@@ -493,6 +497,46 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
+    case "shift_check": {
+      await interaction.deferReply({ ephemeral: true });
+      await runScrape(getConfig, persistConfig, clientRef);
+
+      const configNow = getConfig();
+      const statuses = Object.entries(configNow.boyStatuses || {}).map(
+        ([boyId, info]) => ({ boyId, ...info })
+      );
+      const shift = await fetchTodayShift(configNow);
+      const result = compareShiftWithStatuses(
+        shift.boys,
+        statuses,
+        configNow
+      );
+      result.dateKey = shift.dateKey;
+      result.source = shift.source;
+      result.scheduledCount = shift.boys.length;
+
+      configNow.lastShiftFetch = {
+        at: new Date().toISOString(),
+        dateKey: shift.dateKey,
+        source: shift.source,
+        count: shift.boys.length,
+      };
+      configNow.lastShiftCompare = {
+        at: new Date().toISOString(),
+        ...result,
+        scheduledCount: shift.boys.length,
+      };
+      persistConfig();
+
+      return {
+        type: "deferred",
+        interaction,
+        content: `📋 **${shift.dateKey}** のシフト照合（ソース: ${shift.source}）`,
+        embed: buildShiftCheckEmbed(configNow, result),
+        ephemeral: true,
+      };
+    }
+
     case "help":
       return {
         type: "text",
@@ -510,13 +554,15 @@ export async function handleCommand(interaction, parsed) {
           "• `/再起動` — Bot サーバー再起動",
           "• `/レポート一覧` `/レポート取得` — 確定レポート",
           "• `/レポート途中` — 営業日の現時点までの暫定レポート",
+          "• `/出勤チェック` — シフトとオンライン状態の不一致を確認",
           "• `/設定復元` — config.json をバックアップから復元",
           "• `/ログアウト` — セッション終了",
           "",
           "未ログイン時は各コマンドの `パスワード` オプションでも実行できます。",
           "",
           "### 自動監視",
-          `- **${config.pollIntervalMinutes || 2}分** ごとに x77.jp をチェック`,
+          `- **2分** ごとに x77.jp をチェックし、**dgdgdg シフト** と照合`,
+          `- 出勤シフトなのに未オンライン / シフト外オンライン を **#x77live** に通知`,
           `- **${config.notifyIntervalMinutes}分** ごとに Discord へ定期通知`,
           `- **新規ボーイ** がロスターに追加されると通知`,
           `- **毎日 01:00** に本日のオンライン稼働サマリーを投稿（待機/通話時間を分離集計）`,

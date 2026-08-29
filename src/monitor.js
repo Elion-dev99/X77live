@@ -5,6 +5,7 @@ import { buildBoyStatusChangeMessage, isOnlineStatus } from "./format.js";
 import { tickDailyStats } from "./daily-stats.js";
 import { handleScrapeSuccess, handleScrapeFailure } from "./scrape-health.js";
 import { markBotLivenessHealthy } from "./bot-liveness.js";
+import { runShiftCheck } from "./shift-monitor.js";
 
 /** @type {ReturnType<typeof setInterval>|null} */
 let pollHandle = null;
@@ -169,6 +170,13 @@ export async function runScrape(getConfig, persistConfig, client = null) {
 
     await handleScrapeSuccess(config, client, persistConfig);
     markBotLivenessHealthy(config);
+
+    try {
+      await runShiftCheck(config, statuses, client);
+    } catch (err) {
+      console.error("[shift] 照合エラー:", err.message);
+    }
+
     persistConfig();
 
     console.log(
