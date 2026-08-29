@@ -449,52 +449,62 @@ export async function handleCommand(interaction, parsed) {
 
     case "report_interim": {
       await interaction.deferReply({ ephemeral: true });
-      await runScrape(getConfig, persistConfig, clientRef);
+      try {
+        await runScrape(getConfig, persistConfig, clientRef);
 
-      const now = new Date();
-      const current = getCurrentBusinessDayStats(getConfig(), now);
-      if (!current.ok) {
+        const now = new Date();
+        const current = getCurrentBusinessDayStats(getConfig(), now);
+        if (!current.ok) {
+          return {
+            type: "deferred",
+            interaction,
+            content:
+              "⚠️ 現在は営業時間外です（営業 **13:00 〜 翌 01:00**）。\n確定レポートは `/レポート取得` で取得できます。",
+            ephemeral: true,
+          };
+        }
+
+        const configNow = getConfig();
+        const { stats } = current;
+        const embed = buildDailySummaryEmbed(configNow, stats, {
+          interim: true,
+          asOf: now,
+        });
+
+        const format = parsed.format || "view";
+        if (format === "view") {
+          return {
+            type: "deferred",
+            interaction,
+            embed,
+            ephemeral: true,
+          };
+        }
+
+        const interim = buildInterimReportFiles(
+          configNow,
+          stats,
+          format,
+          now
+        );
+
         return {
           type: "deferred",
           interaction,
-          content:
-            "⚠️ 現在は営業時間外です（営業 **13:00 〜 翌 01:00**）。\n確定レポートは `/レポート取得` で取得できます。",
-          ephemeral: true,
-        };
-      }
-
-      const configNow = getConfig();
-      const { stats } = current;
-      const embed = buildDailySummaryEmbed(configNow, stats, {
-        interim: true,
-        asOf: now,
-      });
-
-      const format = parsed.format || "view";
-      if (format === "view") {
-        return {
-          type: "deferred",
-          interaction,
+          content: `📊 営業日 **${stats.sessionKey}** の途中経過レポート（暫定）`,
           embed,
+          files: interim.files,
+          ephemeral: true,
+        };
+      } catch (err) {
+        console.error("[report] 途中レポート生成エラー:", err);
+        return {
+          type: "deferred",
+          interaction,
+          content: `⚠️ レポート生成中にエラーが発生しました: ${err.message}`,
           ephemeral: true,
         };
       }
-
-      const interim = buildInterimReportFiles(
-        configNow,
-        stats,
-        format === "view" ? "both" : format,
-        now
-      );
-
-      return {
-        type: "deferred",
-        interaction,
-        content: `📊 営業日 **${stats.sessionKey}** の途中経過レポート（暫定）`,
-        embed,
-        files: interim.files,
-        ephemeral: true,
-      };
     }
 
     case "shift_check": {

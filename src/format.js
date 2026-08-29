@@ -216,6 +216,38 @@ export function buildNewBoyMessage(boy, storeName) {
   ].join("\n");
 }
 
+const DAILY_SUMMARY_MAX_RANKING = 25;
+
+function appendRankingFields(embed, lines, firstFieldName = "稼働時間ランキング") {
+  let chunk = "";
+  let fieldIndex = 1;
+  let fieldsAdded = 0;
+
+  for (const line of lines) {
+    if (fieldsAdded >= 24) break;
+
+    const next = chunk ? `${chunk}\n${line}` : line;
+    if (next.length > 1000 && chunk) {
+      embed.addFields({
+        name: fieldIndex === 1 ? firstFieldName : "　",
+        value: chunk.slice(0, 1024),
+      });
+      fieldsAdded++;
+      fieldIndex++;
+      chunk = line;
+    } else {
+      chunk = next;
+    }
+  }
+
+  if (chunk && fieldsAdded < 25) {
+    embed.addFields({
+      name: fieldIndex === 1 ? firstFieldName : "　",
+      value: chunk.slice(0, 1024),
+    });
+  }
+}
+
 /**
  * @param {object} config
  * @param {{ sessionKey: string, boys: Record<string, { name: string, onlineMinutes: number }> }} stats
@@ -277,37 +309,27 @@ export function buildDailySummaryEmbed(config, stats, options = {}) {
   descParts.push(`オンライン稼働: **${entries.length}** 名`);
   embed.setDescription(descParts.join("\n"));
 
-  const lines = entries.map((e, i) => {
+  const displayEntries = entries.slice(0, DAILY_SUMMARY_MAX_RANKING);
+  const hiddenCount = entries.length - displayEntries.length;
+
+  const lines = displayEntries.map((e, i) => {
     const total = formatDurationMinutes(e.onlineMinutes);
     const waiting = formatDurationMinutes(e.waitingMinutes);
     const inCall = formatDurationMinutes(e.inCallMinutes);
     return `${i + 1}. **${e.name}** — ${total}（待機 ${waiting} / 通話 ${inCall}）`;
   });
 
-  let chunk = "";
-  let fieldIndex = 1;
-  for (const line of lines) {
-    const next = chunk ? `${chunk}\n${line}` : line;
-    if (next.length > 1000 && chunk) {
-      embed.addFields({
-        name: fieldIndex === 1 ? "稼働時間ランキング" : "　",
-        value: chunk,
-      });
-      fieldIndex++;
-      chunk = line;
-    } else {
-      chunk = next;
-    }
-  }
-  if (chunk) {
+  appendRankingFields(embed, lines);
+
+  if (hiddenCount > 0) {
     embed.addFields({
-      name: fieldIndex === 1 ? "稼働時間ランキング" : "　",
-      value: chunk.slice(0, 1024),
+      name: "　",
+      value: `_他 **${hiddenCount}** 名は \`/レポート取得\` または CSV/JSON を参照_`,
     });
   }
 
   embed.setFooter({
-    text: `${config.settings.footerText} | 合計 ${formatDurationMinutes(totalMinutes)}`,
+    text: `${config.settings.footerText} | 合計 ${formatDurationMinutes(totalMinutes)}${hiddenCount > 0 ? ` | 表示 ${displayEntries.length}/${entries.length} 名` : ""}`,
   });
 
   return embed;
