@@ -52,6 +52,11 @@
 | `BOT_LIVENESS_MINUTES` | 任意 | 監視停止とみなす分数。デフォルト `10` |
 | `BOT_LIVENESS_ENABLED` | 任意 | Bot 死活監視（管理者 DM）。デフォルト `true` |
 | `WEEKLY_SUMMARY_ENABLED` | 任意 | 週次レポート（日曜営業終了後=月01:00）。デフォルト `true` |
+| `SHIFT_CHECK_ENABLED` | 任意 | シフト照合の自動実行。デフォルト `true` |
+| `SHIFT_ALERT_ENABLED` | 任意 | 不一致時の `#x77live` 通知。デフォルト `true` |
+| `SHIFT_GRACE_MINUTES` | 任意 | シフト開始後の猶予（分）。デフォルト `15` |
+| `EX_SHIFT_ENABLED` | 任意 | EX API 連携。デフォルト `true`（`false` で dgdgdg のみ） |
+| `EX_SHIFT_JSON_URL` | 任意 | カスタムシフト JSON URL（省略時は EX 本番 API） |
 
 ### 管理者 DM（ADMIN_USER_ID）の取得
 

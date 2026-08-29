@@ -62,6 +62,9 @@ export function defaultConfig() {
     lastReportBackupSessionKey: null,
     lastConfigBackupAt: null,
     lastWeeklySummaryWeekKey: null,
+    lastShiftFetch: null,
+    lastShiftCompare: null,
+    shiftAlertState: {},
     botLiveness: {
       alertSent: false,
       lastAlertAt: null,
@@ -101,6 +104,9 @@ export function defaultConfig() {
       botLivenessEnabled: process.env.BOT_LIVENESS_ENABLED !== "false",
       botLivenessMinutes: Number(process.env.BOT_LIVENESS_MINUTES) || 10,
       weeklySummaryEnabled: process.env.WEEKLY_SUMMARY_ENABLED !== "false",
+      shiftCheckEnabled: process.env.SHIFT_CHECK_ENABLED !== "false",
+      shiftAlertEnabled: process.env.SHIFT_ALERT_ENABLED !== "false",
+      shiftGraceMinutes: Number(process.env.SHIFT_GRACE_MINUTES) || 15,
       statusChangeChannelId: null,
       maxHistoryEntries: 200,
       sortBy: "name",
@@ -149,6 +155,12 @@ export function loadConfig() {
       lastReportBackupSessionKey: raw.lastReportBackupSessionKey || null,
       lastConfigBackupAt: raw.lastConfigBackupAt || null,
       lastWeeklySummaryWeekKey: raw.lastWeeklySummaryWeekKey || null,
+      lastShiftFetch: raw.lastShiftFetch || null,
+      lastShiftCompare: raw.lastShiftCompare || null,
+      shiftAlertState:
+        raw.shiftAlertState && typeof raw.shiftAlertState === "object"
+          ? raw.shiftAlertState
+          : {},
       botLiveness: {
         ...defaults.botLiveness,
         ...(raw.botLiveness && typeof raw.botLiveness === "object"
