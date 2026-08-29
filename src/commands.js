@@ -117,7 +117,9 @@ export async function handleCommand(interaction, parsed) {
     case "refresh": {
       await interaction.deferReply({ ephemeral: true });
       try {
-        const result = await runScrape(getConfig, persistConfig, clientRef);
+        const result = await runScrape(getConfig, persistConfig, clientRef, {
+          force: true,
+        });
         const s = result.summary;
         return {
           type: "deferred",
@@ -261,7 +263,7 @@ export async function handleCommand(interaction, parsed) {
       });
       persistConfig();
 
-      await runScrape(getConfig, persistConfig, clientRef);
+      await runScrape(getConfig, persistConfig, clientRef, { force: true });
 
       return {
         type: "text",
@@ -338,10 +340,15 @@ export async function handleCommand(interaction, parsed) {
 
     case "notify_test": {
       await interaction.deferReply({ ephemeral: true });
-      await runScrape(getConfig, persistConfig, clientRef);
+      await runScrape(getConfig, persistConfig, clientRef, { force: true });
 
       if (clientRef) {
-        await sendPeriodicNotification(getConfig, persistConfig, buildNotificationEmbed);
+        await sendPeriodicNotification(
+          getConfig,
+          persistConfig,
+          buildNotificationEmbed,
+          { force: true }
+        );
       }
 
       return {
@@ -509,7 +516,7 @@ export async function handleCommand(interaction, parsed) {
 
     case "shift_check": {
       await interaction.deferReply({ ephemeral: true });
-      await runScrape(getConfig, persistConfig, clientRef);
+      await runScrape(getConfig, persistConfig, clientRef, { force: true });
 
       const configNow = getConfig();
       const statuses = Object.entries(configNow.boyStatuses || {}).map(

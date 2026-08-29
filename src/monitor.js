@@ -6,6 +6,7 @@ import { tickDailyStats } from "./daily-stats.js";
 import { handleScrapeSuccess, handleScrapeFailure } from "./scrape-health.js";
 import { markBotLivenessHealthy } from "./bot-liveness.js";
 import { runShiftCheck } from "./shift-monitor.js";
+import { shouldRunScheduledMonitoring } from "./business-hours.js";
 
 /** @type {ReturnType<typeof setInterval>|null} */
 let pollHandle = null;
@@ -117,8 +118,19 @@ function applyScrapeResult(config, data) {
   return filtered;
 }
 
-export async function runScrape(getConfig, persistConfig, client = null) {
+export async function runScrape(getConfig, persistConfig, client = null, options = {}) {
   const config = getConfig();
+  const settings = config.settings || {};
+  const now = options.now || new Date();
+
+  if (
+    !options.force &&
+    !shouldRunScheduledMonitoring(now, settings)
+  ) {
+    console.log("[monitor] 営業時間外のためスクレイプをスキップ");
+    return { skipped: true, reason: "outside_business_hours" };
+  }
+
   const shopId = config.shopId || "4";
 
   const excludeIds = new Set(

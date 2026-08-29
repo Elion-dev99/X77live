@@ -46,6 +46,12 @@ export function isWithinBusinessHours(date = new Date(), settings = {}) {
   return now >= open || now < close;
 }
 
+/** 定期監視・定期通知を実行してよいか（営業時間外は false） */
+export function shouldRunScheduledMonitoring(date = new Date(), settings = {}) {
+  if (settings.monitorBusinessHoursOnly === false) return true;
+  return isWithinBusinessHours(date, settings);
+}
+
 /**
  * 営業開始日（YYYY-MM-DD）。00:00〜00:59 は前日開始の営業に属する。
  */

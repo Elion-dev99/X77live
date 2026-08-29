@@ -3,6 +3,7 @@ import { getOnlineCount, buildNewBoyMessage } from "./format.js";
 import { sendAdminDirectMessage } from "./admin-notify.js";
 import { getMonitoredBoys } from "./store.js";
 import { runShiftCheck } from "./shift-monitor.js";
+import { shouldRunScheduledMonitoring } from "./business-hours.js";
 
 let intervalHandle = null;
 let currentClient = null;
@@ -49,13 +50,23 @@ export function restartNotifier(client, getConfig, saveConfigFn, buildEmbed) {
 export async function sendPeriodicNotification(
   getConfig,
   saveConfigFn,
-  buildEmbed
+  buildEmbed,
+  options = {}
 ) {
   const config = getConfig();
+  const settings = config.settings || {};
+  const now = options.now || new Date();
 
   if (!config.notifyEnabled) return;
   if (!config.notifyChannelId) {
     console.warn("[notifier] notifyChannelId 未設定のため通知をスキップ");
+    return;
+  }
+  if (
+    !options.force &&
+    !shouldRunScheduledMonitoring(now, settings)
+  ) {
+    console.log("[notifier] 営業時間外のため定期通知をスキップ");
     return;
   }
   if (isInQuietHours(config)) {
