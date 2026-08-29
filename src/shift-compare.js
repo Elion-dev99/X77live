@@ -7,6 +7,12 @@ function parseClockToMinutes(text) {
   return Number(h) * 60 + Number(m);
 }
 
+/** シフト時刻未定（要問合せ等）— 未オンライン通知の対象外 */
+export function isInquiryShiftTime(shiftTime) {
+  if (!shiftTime) return false;
+  return /要問/i.test(String(shiftTime));
+}
+
 /**
  * @param {string} shiftTime e.g. "13:00～21:00", "13:00～LAST", "要問合せ"
  * @param {Date} now
@@ -71,6 +77,7 @@ export function compareShiftWithStatuses(scheduledBoys, statuses, config, now = 
 
   for (const scheduled of scheduledBoys) {
     if (config.boys?.[scheduled.boyId]?.excluded) continue;
+    if (isInquiryShiftTime(scheduled.shiftTime)) continue;
     if (!isWithinShiftWindow(scheduled.shiftTime, now, settings)) continue;
     if (!hasShiftStarted(scheduled.shiftTime, now, grace)) continue;
 

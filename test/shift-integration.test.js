@@ -14,6 +14,7 @@ import {
   compareShiftWithStatuses,
   isWithinShiftWindow,
   hasShiftStarted,
+  isInquiryShiftTime,
 } from '../src/shift-compare.js';
 import { STATUS } from '../src/scraper.js';
 
@@ -105,6 +106,25 @@ describe('shift-compare', () => {
     assert.equal(result.scheduledNotOnline.length, 1);
     assert.equal(result.scheduledNotOnline[0].name, '不在');
     assert.equal(result.onlineNotScheduled.length, 0);
+  });
+
+  it('skips inquiry shifts for scheduled-not-online alerts', () => {
+    assert.equal(isInquiryShiftTime('要問合せ'), true);
+    assert.equal(isInquiryShiftTime('要問い合わせ'), true);
+    assert.equal(isInquiryShiftTime('13:00～21:00'), false);
+
+    const scheduledBoys = [
+      { boyId: '10235', name: 'つむぎ', shiftTime: '13:00～21:00' },
+      { boyId: '77777', name: '未定', shiftTime: '要問合せ' },
+    ];
+    const statuses = [{ boyId: '10235', name: 'つむぎ', status: STATUS.WAITING }];
+    const result = compareShiftWithStatuses(
+      scheduledBoys,
+      statuses,
+      baseConfig,
+      new Date('2026-08-29T06:00:00.000Z')
+    );
+    assert.equal(result.scheduledNotOnline.length, 0);
   });
 
   it('detects online but not on shift', () => {
