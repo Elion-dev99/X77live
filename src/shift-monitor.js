@@ -55,26 +55,25 @@ export async function runShiftCheck(config, statuses, client = null, now = new D
   };
 
   const toNotify = filterForNotification(config, result);
-  const hasAlerts =
-    toNotify.scheduledNotOnline.length > 0 ||
-    toNotify.onlineNotScheduled.length > 0;
 
   if (
-    hasAlerts &&
+    toNotify.onlineNotScheduled.length > 0 &&
     client &&
     settings.shiftAlertEnabled !== false
   ) {
-    await sendShiftMismatchAlert(client, config, toNotify, shift);
-    for (const boy of toNotify.scheduledNotOnline) {
-      markBoyNotified(config, boy.boyId, "missing");
-    }
+    await sendShiftMismatchAlert(
+      client,
+      config,
+      { scheduledNotOnline: [], onlineNotScheduled: toNotify.onlineNotScheduled },
+      shift
+    );
     for (const boy of toNotify.onlineNotScheduled) {
       markBoyNotified(config, boy.boyId, "extra");
     }
     addHistory(config, {
       type: "shift_mismatch",
       dateKey: shift.dateKey,
-      missing: toNotify.scheduledNotOnline.length,
+      missing: 0,
       extra: toNotify.onlineNotScheduled.length,
       source: shift.source,
     });

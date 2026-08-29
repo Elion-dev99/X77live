@@ -1,6 +1,8 @@
 import { isInQuietHours } from "./config.js";
 import { getOnlineCount, buildNewBoyMessage } from "./format.js";
 import { sendAdminDirectMessage } from "./admin-notify.js";
+import { getMonitoredBoys } from "./store.js";
+import { runShiftCheck } from "./shift-monitor.js";
 
 let intervalHandle = null;
 let currentClient = null;
@@ -61,7 +63,19 @@ export async function sendPeriodicNotification(
     return;
   }
 
-  if (getOnlineCount(config) === 0) {
+  if (config.settings.shiftCheckEnabled !== false) {
+    try {
+      await runShiftCheck(config, getMonitoredBoys(config), null);
+      saveConfigFn(config);
+    } catch (err) {
+      console.warn("[notifier] シフト照合更新失敗:", err.message);
+    }
+  }
+
+  const scheduledMissing =
+    config.lastShiftCompare?.scheduledNotOnline?.length || 0;
+
+  if (getOnlineCount(config) === 0 && scheduledMissing === 0) {
     console.log("[notifier] オンライン0名のため通知をスキップ");
     return;
   }

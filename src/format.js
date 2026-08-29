@@ -39,22 +39,38 @@ function getStatusGroups(config) {
 }
 
 /**
- * 定期通知用: 待機中・通話中のみ表示
+ * 定期通知用: 待機中・通話中 + シフト未オンライン
  */
+export function formatScheduledNotOnlineLines(boys, limit = 15) {
+  if (!boys?.length) return null;
+  return boys
+    .slice(0, limit)
+    .map((b) => `**${b.name}** (${b.shiftTime})`)
+    .join("\n")
+    .slice(0, 1024);
+}
+
 export function buildNotificationEmbed(config) {
   const { waiting, inCall } = getStatusGroups(config);
   const onlineCount = waiting.length + inCall.length;
+  const scheduledNotOnline = config.lastShiftCompare?.scheduledNotOnline || [];
 
   const embed = new EmbedBuilder()
     .setTitle(`📡 ${config.storeName} — オンライン`)
     .setColor(config.settings.embedColorSummary)
     .setTimestamp(new Date());
 
-  const desc = [
+  const descParts = [
     `🟢 待機中: **${waiting.length}** 名`,
     `📞 通話中: **${inCall.length}** 名`,
-  ].join("  |  ");
-  embed.setDescription(desc);
+  ];
+  if (
+    scheduledNotOnline.length > 0 &&
+    config.settings.shiftCheckEnabled !== false
+  ) {
+    descParts.push(`🚨 シフト未オンライン: **${scheduledNotOnline.length}** 名`);
+  }
+  embed.setDescription(descParts.join("  |  "));
 
   if (config.settings.showInCallList) {
     embed.addFields({
@@ -70,8 +86,20 @@ export function buildNotificationEmbed(config) {
     });
   }
 
-  if (onlineCount === 0) {
+  const missingLines = formatScheduledNotOnlineLines(scheduledNotOnline);
+  if (missingLines && config.settings.shiftCheckEnabled !== false) {
+    embed.addFields({
+      name: `🚨 出勤なのに未オンライン (${scheduledNotOnline.length})`,
+      value: missingLines,
+    });
+  }
+
+  if (onlineCount === 0 && scheduledNotOnline.length === 0) {
     embed.setDescription("_現在オンラインのボーイはいません_");
+  } else if (onlineCount === 0 && scheduledNotOnline.length > 0) {
+    embed.setDescription(
+      `_現在オンラインのボーイはいません_  |  🚨 シフト未オンライン: **${scheduledNotOnline.length}** 名`
+    );
   }
 
   if (config.lastScrapeAt) {
