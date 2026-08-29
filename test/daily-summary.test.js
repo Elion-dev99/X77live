@@ -260,4 +260,33 @@ describe("daily-report-files", () => {
     assert.match(text, /暫定/);
     assert.match(text, /集計時点/);
   });
+
+  it("buildDailySummaryEmbed stays within Discord embed size for many boys", () => {
+    const config = defaultConfig();
+    const boys = {};
+    for (let i = 0; i < 135; i++) {
+      boys[String(10000 + i)] = {
+        name: `ボーイ名前テスト${i}郎`,
+        onlineMinutes: 120 + i,
+        waitingMinutes: 80,
+        inCallMinutes: 40,
+      };
+    }
+    const embed = buildDailySummaryEmbed(
+      config,
+      { sessionKey: "2026-08-29", boys },
+      { interim: true, asOf: jstDate(2026, 8, 29, 20, 0) }
+    );
+    const data = embed.data;
+    let total =
+      (data.title?.length || 0) +
+      (data.description?.length || 0) +
+      (data.footer?.text?.length || 0);
+    for (const field of data.fields || []) {
+      total += (field.name?.length || 0) + (field.value?.length || 0);
+    }
+    assert.ok(total <= 6000, `embed too large: ${total}`);
+    assert.ok((data.fields?.length || 0) <= 25);
+    assert.match(JSON.stringify(data), /他 \*\*110\*\* 名/);
+  });
 });
