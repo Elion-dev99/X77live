@@ -14,7 +14,7 @@
 
 - **ロスター（在籍ボーイ一覧）**: `dgdgdg.com/boy/list.php?shop_id=4`（大阪店）
 - **稼働状況**: `x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2&search_shop_id=4`（大阪店所属ライバー）
-- **出勤シフト**: `dgdgdg.com/boy/shift.php?shop_id=4`（大阪店）／任意で EX から export した JSON（`EX_SHIFT_JSON_URL`）
+- **出勤シフト**: [EX](https://github.com/Elion-dev99/EX) API（`ex-shift.elion-dev08.workers.dev`）→ 失敗時 `dgdgdg.com/boy/shift.php?shop_id=4`
 
 ## コマンド
 
@@ -55,7 +55,7 @@
 | 🚨 出勤シフトなのに未オンライン | シフト時間内（開始+15分猶予後）なのに待機中/通話中ではない |
 | ⚠️ シフト未登録なのにオンライン | 今日のシフトに載っていないのにオンライン中 |
 
-EX リポジトリ（`Elion-dev99/EX`）と連携する場合は、今日のシフト JSON を公開 URL に置き `EX_SHIFT_JSON_URL` を設定してください。
+EX リポジトリ（[Elion-dev99/EX](https://github.com/Elion-dev99/EX)）の `/api/shop/schedule?shop_id=4` をデフォルトで利用します。EX が利用できない場合は dgdgdg シフトページにフォールバックします。`EX_SHIFT_ENABLED=false` で EX 連携を無効化できます。
 
 ## 定期通知の例
 

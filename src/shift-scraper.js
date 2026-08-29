@@ -6,6 +6,9 @@ import { formatDateKey, getJstParts } from "./business-hours.js";
 
 const ROSTER_FETCH = globalThis.fetch;
 const SHIFT_URL = "https://www.dgdgdg.com/boy/shift.php";
+/** @see https://github.com/Elion-dev99/EX */
+export const DEFAULT_EX_SHIFT_URL =
+  "https://ex-shift.elion-dev08.workers.dev/api/shop/schedule?shop_id=4";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -101,37 +104,70 @@ async function fetchShiftHtml(shopId) {
 }
 
 /**
+ * EX / 手動 export の1ボーイ行を正規化
+ * @param {object} boy
+ */
+export function normalizeExShiftBoy(boy) {
+  const boyId = String(boy.boyId || boy.id || "").trim();
+  if (!boyId) return null;
+
+  let shiftTime = boy.shiftTime || boy.timeText || null;
+  if (!shiftTime && boy.start) {
+    shiftTime = boy.end ? `${boy.start}～${boy.end}` : `${boy.start}～LAST`;
+  }
+
+  return {
+    boyId,
+    name: boy.name || `ID:${boyId}`,
+    shiftTime: shiftTime || "要問合せ",
+    night: boy.night ?? null,
+  };
+}
+
+/**
  * EX アプリ等から export した JSON
- * { date, boys: [{ boyId, name, start?, end?, shiftTime? }] }
+ * - 手動 export: { date, boys: [{ boyId, name, start?, end?, shiftTime? }] }
+ * - EX API: { days: [{ date, boys: [{ boyId, name, timeText? }] }] }
  */
 export function normalizeExShiftDocument(raw, dateKey) {
   if (!raw || typeof raw !== "object") return null;
 
-  const docDate = raw.date || raw.sessionKey || dateKey;
+  const docDate = raw.date || raw.dateKey || raw.sessionKey || dateKey;
   const sourceBoys = Array.isArray(raw.boys)
     ? raw.boys
     : Array.isArray(raw.scheduled)
       ? raw.scheduled
       : [];
 
-  const boys = sourceBoys
-    .map((boy) => {
-      const boyId = String(boy.boyId || boy.id || "").trim();
-      if (!boyId) return null;
-      let shiftTime = boy.shiftTime || null;
-      if (!shiftTime && boy.start) {
-        shiftTime = boy.end ? `${boy.start}～${boy.end}` : `${boy.start}～LAST`;
-      }
-      return {
-        boyId,
-        name: boy.name || `ID:${boyId}`,
-        shiftTime: shiftTime || "要問合せ",
-        night: boy.night ?? null,
-      };
-    })
-    .filter(Boolean);
+  const boys = sourceBoys.map(normalizeExShiftBoy).filter(Boolean);
 
   return { dateKey: docDate, boys };
+}
+
+/**
+ * EX shop schedule API 等のレスポンスから指定日を抽出
+ * @param {object|Array} raw
+ * @param {string} dateKey
+ */
+export function extractExShiftDay(raw, dateKey) {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    return (
+      raw.find((item) => item.date === dateKey || item.dateKey === dateKey) ||
+      null
+    );
+  }
+  if (raw.days && Array.isArray(raw.days)) {
+    return (
+      raw.days.find(
+        (item) => item.date === dateKey || item.dateKey === dateKey
+      ) || null
+    );
+  }
+  if (Array.isArray(raw.boys) || Array.isArray(raw.scheduled)) {
+    return raw;
+  }
+  return null;
 }
 
 async function loadShiftFromExUrl(url, dateKey) {
@@ -142,15 +178,17 @@ async function loadShiftFromExUrl(url, dateKey) {
     throw new Error(`EXシフト JSON HTTP ${res.status}`);
   }
   const raw = await res.json();
-  if (Array.isArray(raw)) {
-    const day = raw.find((item) => item.date === dateKey || item.sessionKey === dateKey);
-    return day ? normalizeExShiftDocument(day, dateKey) : null;
+  const day = extractExShiftDay(raw, dateKey);
+  return day ? normalizeExShiftDocument(day, dateKey) : null;
+}
+
+function resolveExShiftUrl(config) {
+  const fromEnv = process.env.EX_SHIFT_JSON_URL?.trim();
+  if (fromEnv) return fromEnv;
+  if (config.settings?.exShiftJsonUrl?.trim()) {
+    return config.settings.exShiftJsonUrl.trim();
   }
-  if (raw.days && Array.isArray(raw.days)) {
-    const day = raw.days.find((item) => item.date === dateKey || item.dateKey === dateKey);
-    return day ? normalizeExShiftDocument(day, dateKey) : null;
-  }
-  return normalizeExShiftDocument(raw, dateKey);
+  return DEFAULT_EX_SHIFT_URL;
 }
 
 /**
@@ -159,12 +197,20 @@ async function loadShiftFromExUrl(url, dateKey) {
 export async function fetchTodayShift(config, now = new Date()) {
   const shopId = config.shopId || "4";
   const dateKey = getTodayDateKey(now);
-  const exUrl = process.env.EX_SHIFT_JSON_URL?.trim();
+  const exUrl = resolveExShiftUrl(config);
+  const exDisabled = process.env.EX_SHIFT_ENABLED === "false";
 
-  if (exUrl) {
-    const fromEx = await loadShiftFromExUrl(exUrl, dateKey);
-    if (fromEx?.boys?.length) {
-      return { ...fromEx, source: "ex-json" };
+  if (exUrl && !exDisabled) {
+    try {
+      const fromEx = await loadShiftFromExUrl(exUrl, dateKey);
+      if (fromEx?.boys?.length) {
+        return {
+          ...fromEx,
+          source: exUrl === DEFAULT_EX_SHIFT_URL ? "ex-api" : "ex-json",
+        };
+      }
+    } catch (err) {
+      console.warn("[shift] EX シフト取得失敗、dgdgdg にフォールバック:", err.message);
     }
   }
 

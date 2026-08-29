@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import {
   parseShiftPage,
   normalizeExShiftDocument,
+  normalizeExShiftBoy,
+  extractExShiftDay,
   findShiftDay,
 } from '../src/shift-scraper.js';
 import {
@@ -44,6 +46,40 @@ describe('shift-scraper', () => {
     assert.equal(result.dateKey, '2026-08-29');
     assert.equal(result.boys.length, 2);
     assert.equal(result.boys[0].shiftTime, '13:00～21:00');
+  });
+
+  it('normalizes EX shop schedule API response', () => {
+    const apiResponse = {
+      shopId: 4,
+      affiliation: '大阪店',
+      days: [
+        {
+          date: '2026-08-29',
+          dateLabel: '8/29(土)',
+          boys: [
+            {
+              boyId: 10235,
+              name: 'つむぎ',
+              timeText: '13:00～LAST',
+              status: 'work',
+            },
+            {
+              boyId: 11920,
+              name: 'れんた',
+              timeText: '17:00～21:00',
+              status: 'work',
+            },
+          ],
+        },
+      ],
+    };
+
+    const day = extractExShiftDay(apiResponse, '2026-08-29');
+    assert.ok(day);
+    const result = normalizeExShiftDocument(day, '2026-08-29');
+    assert.equal(result.boys.length, 2);
+    assert.equal(result.boys[0].shiftTime, '13:00～LAST');
+    assert.equal(normalizeExShiftBoy({ boyId: 1, timeText: '14:00～18:00' }).shiftTime, '14:00～18:00');
   });
 });
 
