@@ -18,12 +18,17 @@ import { startDailySummaryScheduler } from "./daily-stats.js";
 import { startReportBackupScheduler } from "./report-backup.js";
 import { startConfigBackupScheduler } from "./config-backup.js";
 import { startBotLivenessScheduler } from "./bot-liveness.js";
+import { acquireInstanceLock } from "./instance-lock.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
   console.error(
     "DISCORD_TOKEN が未設定です。ホスティングの環境変数に DISCORD_TOKEN を設定してください。"
   );
+  process.exit(1);
+}
+
+if (!acquireInstanceLock()) {
   process.exit(1);
 }
 

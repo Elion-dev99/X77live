@@ -54,6 +54,8 @@ export function buildNotificationEmbed(config) {
   const { waiting, inCall } = getStatusGroups(config);
   const onlineCount = waiting.length + inCall.length;
   const scheduledNotOnline = config.lastShiftCompare?.scheduledNotOnline || [];
+  const onlineNotScheduled = config.lastShiftCompare?.onlineNotScheduled || [];
+  const shiftCheckOn = config.settings.shiftCheckEnabled !== false;
 
   const embed = new EmbedBuilder()
     .setTitle(`📡 ${config.storeName} — オンライン`)
@@ -64,11 +66,11 @@ export function buildNotificationEmbed(config) {
     `🟢 待機中: **${waiting.length}** 名`,
     `📞 通話中: **${inCall.length}** 名`,
   ];
-  if (
-    scheduledNotOnline.length > 0 &&
-    config.settings.shiftCheckEnabled !== false
-  ) {
+  if (scheduledNotOnline.length > 0 && shiftCheckOn) {
     descParts.push(`🚨 シフト未オンライン: **${scheduledNotOnline.length}** 名`);
+  }
+  if (onlineNotScheduled.length > 0 && shiftCheckOn) {
+    descParts.push(`⚠️ シフト外オンライン: **${onlineNotScheduled.length}** 名`);
   }
   embed.setDescription(descParts.join("  |  "));
 
@@ -87,19 +89,39 @@ export function buildNotificationEmbed(config) {
   }
 
   const missingLines = formatScheduledNotOnlineLines(scheduledNotOnline);
-  if (missingLines && config.settings.shiftCheckEnabled !== false) {
+  if (missingLines && shiftCheckOn) {
     embed.addFields({
       name: `🚨 出勤なのに未オンライン (${scheduledNotOnline.length})`,
       value: missingLines,
     });
   }
 
-  if (onlineCount === 0 && scheduledNotOnline.length === 0) {
+  if (onlineNotScheduled.length > 0 && shiftCheckOn) {
+    const extraLines = onlineNotScheduled
+      .slice(0, 15)
+      .map((b) => `**${b.name}** — ${b.status}`)
+      .join("\n")
+      .slice(0, 1024);
+    embed.addFields({
+      name: `⚠️ シフト外オンライン (${onlineNotScheduled.length})`,
+      value: extraLines,
+    });
+  }
+
+  const hasShiftMismatch =
+    scheduledNotOnline.length > 0 || onlineNotScheduled.length > 0;
+
+  if (onlineCount === 0 && !hasShiftMismatch) {
     embed.setDescription("_現在オンラインのボーイはいません_");
-  } else if (onlineCount === 0 && scheduledNotOnline.length > 0) {
-    embed.setDescription(
-      `_現在オンラインのボーイはいません_  |  🚨 シフト未オンライン: **${scheduledNotOnline.length}** 名`
-    );
+  } else if (onlineCount === 0 && hasShiftMismatch) {
+    const parts = ["_現在オンラインのボーイはいません_"];
+    if (scheduledNotOnline.length > 0) {
+      parts.push(`🚨 シフト未オンライン: **${scheduledNotOnline.length}** 名`);
+    }
+    if (onlineNotScheduled.length > 0) {
+      parts.push(`⚠️ シフト外オンライン: **${onlineNotScheduled.length}** 名`);
+    }
+    embed.setDescription(parts.join("  |  "));
   }
 
   if (config.lastScrapeAt) {
