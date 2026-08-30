@@ -2,6 +2,24 @@
 
 [x77.jp/live/twoshot_liverlist.php](https://x77.jp/live/twoshot_liverlist.php?search_tribe=1&search_group_id=2&search_shop_id=4) から **大阪店ボーイのみ** の稼働状況を自動監視し、Discord に定期通知する Bot です。
 
+## 仕様書（開発・運用）
+
+**コードの管理・改修用ドキュメント**: [docs/README.md](./docs/README.md)
+
+| ドキュメント | 内容 |
+|-------------|------|
+| [docs/00-overview.md](./docs/00-overview.md) | システム概要 |
+| [docs/01-architecture.md](./docs/01-architecture.md) | モジュール構成・起動フロー |
+| [docs/02-environment-and-config.md](./docs/02-environment-and-config.md) | 環境変数・config.json |
+| [docs/03-monitoring-and-scraping.md](./docs/03-monitoring-and-scraping.md) | 監視・スクレイプ |
+| [docs/04-notifications.md](./docs/04-notifications.md) | 通知仕様 |
+| [docs/05-shift-integration.md](./docs/05-shift-integration.md) | シフト連携 |
+| [docs/06-reports-and-backups.md](./docs/06-reports-and-backups.md) | レポート・バックアップ |
+| [docs/07-commands-and-auth.md](./docs/07-commands-and-auth.md) | コマンド・認証 |
+| [docs/08-operations.md](./docs/08-operations.md) | デプロイ・運用 |
+| [docs/09-development.md](./docs/09-development.md) | 開発ガイド |
+| [docs/site-access-log.md](./docs/site-access-log.md) | 外部サイトアクセス一覧 |
+
 ## 監視ステータス
 
 | ステータス | 意味 | 取得方法 |
@@ -43,12 +61,11 @@
 
 ## 自動動作
 
-- **2分ごと**（カスタマイズ可）: x77.jp をスクレイプしてステータス更新
-- **10分ごと**（カスタマイズ可）: Discord チャンネルに Embed 通知（待機中/通話中 + **出勤なのに未オンライン**）
+- **2分ごと**（カスタマイズ可）: x77.jp をスクレイプ（**営業時間 13:00〜翌01:00 のみ**、デフォルト）
+- **10分ごと**（カスタマイズ可）: Discord チャンネルに Embed 通知（待機中/通話中 + シフト不一致）
 - **ステータス変更時**: 即時通知（例: オフライン → 待機中）
 - **シフト照合**（営業時間内）: 出勤シフトとオンライン状態を照合
-- **未オンライン一覧**は10分ごとの定期通知に含める（要問合せシフトは除外）
-- **シフト外オンライン**のみ即時通知（30分クールダウン）
+- **未オンライン / シフト外オンライン** は10分ごとの定期通知 Embed に含める（要問合せシフトは未オンライン対象外）
 
 ### シフト照合で検出する不一致
 
