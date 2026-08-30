@@ -13,6 +13,7 @@ import {
   buildInterimReportFiles,
 } from "./daily-report-files.js";
 import { runShiftCheck } from "./shift-monitor.js";
+import { getCurrentBusinessDayStats } from "./daily-stats.js";
 import { fetchTodayShift } from "./shift-scraper.js";
 import { compareShiftWithStatuses } from "./shift-compare.js";
 import {
