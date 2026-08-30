@@ -8,6 +8,17 @@ import { shouldRunScheduledMonitoring } from "./business-hours.js";
 let intervalHandle = null;
 let currentClient = null;
 
+function getNotifyMinGapMs(config) {
+  const intervalMs = (config.notifyIntervalMinutes || 10) * 60 * 1000;
+  return Math.max(intervalMs * 0.85, 60 * 1000);
+}
+
+export function shouldSkipDuplicateNotification(config, now = new Date()) {
+  if (!config.lastNotifyAt) return false;
+  const elapsed = now.getTime() - new Date(config.lastNotifyAt).getTime();
+  return elapsed < getNotifyMinGapMs(config);
+}
+
 export function startNotifier(client, getConfig, saveConfigFn, buildEmbed) {
   stopNotifier();
   currentClient = client;
@@ -23,8 +34,9 @@ export function startNotifier(client, getConfig, saveConfigFn, buildEmbed) {
     await sendPeriodicNotification(getConfig, saveConfigFn, buildEmbed);
   }, intervalMs);
 
-  // 起動直後にも1回送信
-  sendPeriodicNotification(getConfig, saveConfigFn, buildEmbed).catch((err) => {
+  sendPeriodicNotification(getConfig, saveConfigFn, buildEmbed, {
+    skipIfRecent: true,
+  }).catch((err) => {
     console.error("[notifier] 初回通知エラー:", err.message);
   });
 
@@ -74,6 +86,16 @@ export async function sendPeriodicNotification(
     return;
   }
 
+  if (!options.force && options.skipIfRecent && shouldSkipDuplicateNotification(config, now)) {
+    console.log("[notifier] 直近に送信済みのため初回通知をスキップ");
+    return;
+  }
+
+  if (!options.force && shouldSkipDuplicateNotification(config, now)) {
+    console.log("[notifier] 通知間隔内の重複送信をスキップ");
+    return;
+  }
+
   if (config.settings.shiftCheckEnabled !== false) {
     try {
       await runShiftCheck(config, getMonitoredBoys(config), null);
@@ -85,8 +107,10 @@ export async function sendPeriodicNotification(
 
   const scheduledMissing =
     config.lastShiftCompare?.scheduledNotOnline?.length || 0;
+  const extraOnline =
+    config.lastShiftCompare?.onlineNotScheduled?.length || 0;
 
-  if (getOnlineCount(config) === 0 && scheduledMissing === 0) {
+  if (getOnlineCount(config) === 0 && scheduledMissing === 0 && extraOnline === 0) {
     console.log("[notifier] オンライン0名のため通知をスキップ");
     return;
   }
