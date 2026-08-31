@@ -19,12 +19,12 @@ import { startReportBackupScheduler } from "./report-backup.js";
 import { startConfigBackupScheduler } from "./config-backup.js";
 import { startBotLivenessScheduler } from "./bot-liveness.js";
 import { acquireInstanceLock } from "./instance-lock.js";
+import { startSessionCleanupScheduler } from "./session-manager.js";
+import { info, warn, error } from "./logger.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
-  console.error(
-    "DISCORD_TOKEN が未設定です。ホスティングの環境変数に DISCORD_TOKEN を設定してください。"
-  );
+  error("DISCORD_TOKEN が未設定です。ホスティングの環境変数に DISCORD_TOKEN を設定してください。");
   process.exit(1);
 }
 
@@ -35,12 +35,14 @@ if (!acquireInstanceLock()) {
 const clientId = process.env.DISCORD_CLIENT_ID;
 const guildId = process.env.DISCORD_GUILD_ID;
 
-console.log("[boot] NODE_ENV=", process.env.NODE_ENV || "development");
-console.log("[boot] DISCORD_CLIENT_ID=", clientId ? "set" : "missing");
-console.log("[boot] DISCORD_GUILD_ID=", guildId || "(global slash registration)");
-console.log("[boot] PORT=", process.env.PORT || "(default 8080 for health)");
+info(`NODE_ENV = ${process.env.NODE_ENV || "development"}`);
+info(`DISCORD_CLIENT_ID = ${clientId ? "set" : "missing"}`);
+info(`DISCORD_GUILD_ID = ${guildId || "(global slash registration)"}`);
+info(`PORT = ${process.env.PORT || "(default 8080 for health)"}`);
 
 startHealthServer();
+
+let sessionCleanupHandle = null;
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -48,9 +50,7 @@ const client = new Client({
 
 async function registerSlashCommands() {
   if (!clientId) {
-    console.warn(
-      "[warn] DISCORD_CLIENT_ID が未設定のため、スラッシュコマンドを自動登録しません。"
-    );
+    warn("DISCORD_CLIENT_ID が未設定のため、スラッシュコマンドを自動登録しません。");
     return;
   }
   const commands = buildSlashCommands();
@@ -60,39 +60,34 @@ async function registerSlashCommands() {
       await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
         body: commands,
       });
-      console.log(
-        `スラッシュコマンドをギルド ${guildId} に登録しました (${commands.length}件)`
-      );
+      info(`スラッシュコマンドをギルド ${guildId} に登録しました (${commands.length}件)`);
     } else {
       await rest.put(Routes.applicationCommands(clientId), {
         body: commands,
       });
-      console.log(
-        `スラッシュコマンドをグローバル登録しました (${commands.length}件)`
-      );
+      info(`スラッシュコマンドをグローバル登録しました (${commands.length}件)`);
     }
   } catch (err) {
-    console.error("スラッシュコマンド登録エラー:", err);
+    error("スラッシュコマンド登録エラー", err);
   }
 }
 
 client.once(Events.ClientReady, async (c) => {
   try {
-    console.log(`ログイン完了: ${c.user.tag}`);
+    info(`ログイン完了: ${c.user.tag}`);
     initCommands(client);
 
     const config = getConfig();
-    console.log(`[boot] 店舗: ${config.storeName} (shop_id=${config.shopId})`);
-    console.log(
-      `[boot] 監視間隔: ${config.pollIntervalMinutes}分 / 通知間隔: ${config.notifyIntervalMinutes}分`
-    );
-    console.log(
-      `[boot] 通知チャンネル: ${config.notifyChannelId || "未設定"}`
-    );
+    info(`店舗: ${config.storeName} (shop_id=${config.shopId})`);
+    info(`監視間隔: ${config.pollIntervalMinutes}分 / 通知間隔: ${config.notifyIntervalMinutes}分`);
+    info(`通知チャンネル: ${config.notifyChannelId || "未設定"}`);
     const adminIds = config.adminUserIds?.length
       ? config.adminUserIds.join(", ")
       : config.adminUserId || "未設定";
-    console.log(`[boot] 管理者DM: ${adminIds}`);
+    info(`管理者DM: ${adminIds}`);
+
+    // セッション自動削除スケジューラーを開始
+    sessionCleanupHandle = startSessionCleanupScheduler(getConfig, persistConfig);
 
     startMonitor(client, getConfig, persistConfig);
     startDailySummaryScheduler(client, getConfig, persistConfig);
@@ -104,7 +99,7 @@ client.once(Events.ClientReady, async (c) => {
       startNotifier(client, getConfig, persistConfig, buildNotificationEmbed);
     }
   } catch (err) {
-    console.error("[warn] 起動後処理エラー（Bot本体は稼働中）:", err);
+    error("起動後処理エラー（Bot本体は稼働中）", err);
   }
 
   await registerSlashCommands();

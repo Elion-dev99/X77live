@@ -2,6 +2,11 @@
  * x77.jp / dgdgdg.com から大阪店ボーイの稼働状況を取得
  */
 
+import { fetchWithRetry } from "./network.js";
+import { getLogger } from "./logger.js";
+
+const logger = getLogger("scraper");
+
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -44,7 +49,7 @@ async function fetchPage(url, options = {}) {
       .join("; ");
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     ...options,
     headers,
     redirect: "follow",
@@ -61,10 +66,6 @@ async function fetchPage(url, options = {}) {
       sessionCookies.set(name, value);
       lastCookieRefresh = Date.now();
     }
-  }
-
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} for ${url}`);
   }
 
   return res.text();
@@ -93,7 +94,7 @@ async function ensureSession(shopId = DEFAULT_SHOP_ID) {
   }
 
   const refUrl = buildLiverListUrl(1, shopId);
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${AGE_VERIFY_URL}&ref=${encodeURIComponent(refUrl)}`,
     { headers, redirect: "manual" }
   );
