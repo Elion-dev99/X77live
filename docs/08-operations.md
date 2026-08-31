@@ -2,30 +2,34 @@
 
 ## Bot-Hosting.net（本番）
 
-詳細手順: [BOT-HOSTING.md](../BOT-HOSTING.md)  
-env テンプレート: [bot-hosting.env.example](../bot-hosting.env.example)
+📖 **詳細手順**: [BOT-HOSTING.md](../BOT-HOSTING.md) を参照  
+📝 **環境変数テンプレート**: [bot-hosting.env.example](../bot-hosting.env.example)
 
-### セットアップ
+### セットアップクイックスタート
 
-1. GitHub `Elion-dev99/X77live` / branch `main` を Import
-2. **Runtime**: Node.js 18+
-3. **Entry file**: `index.js`
-4. **Environment Variables**: テンプレートをコピー
-5. Start → Console ログ確認
+1. [Bot-Hosting.net](https://bot-hosting.net/) にログイン
+2. **New Deployment** → **Application**
+3. GitHub: `Elion-dev99/X77live` / `main` ブランチ
+4. Runtime: **Node.js 18+**
+5. Entry File: **`index.js`**
+6. Environment Variables: [bot-hosting.env.example](../bot-hosting.env.example) をコピー
+7. **Start** → Console ログ確認
 
-### 必須 env（本番）
+### 必須環境変数（本番）
 
 ```
-DISCORD_TOKEN=...
+DISCORD_TOKEN=your_bot_token_here         (Secret)
 DISCORD_CLIENT_ID=...
-DISCORD_GUILD_ID=...          # ギルド限定コマンド（推奨）
-NOTIFY_CHANNEL_ID=...         # #x77live
-ADMIN_PASSWORD=...
-ADMIN_USER_ID=...             # 管理者 DM 先
+DISCORD_GUILD_ID=...
+NOTIFY_CHANNEL_ID=...                      (#x77live のID)
+ADMIN_PASSWORD=...                         (Secret)
+ADMIN_USER_ID=...                          (管理者のDiscord ID)
 DATA_DIR=data
 ```
 
-### 起動成功ログの例
+その他の推奨環境変数は [BOT-HOSTING.md § 3](../BOT-HOSTING.md#3-環境変数) を参照。
+
+### 起動成功時のログ
 
 ```
 [boot] using DATA_DIR= /home/container/data
@@ -35,13 +39,97 @@ DATA_DIR=data
 スラッシュコマンドをギルド ... に登録しました (18件)
 ```
 
-### 更新反映
+### GitHub からの自動更新
 
-1. GitHub `main` に merge
-2. Bot-Hosting **Git タブ → Auto Pull** または手動 Pull
-3. **Restart**（Console）
+**Bot-Hosting ダッシュボード:**
 
-`/再起動` スラッシュコマンドでも可（Bot-Hosting が自動再起動）。
+1. **Git** タブ → リポジトリ接続
+2. **Auto Pull** を ON
+3. `main` ブランチ push 後、自動同期・再起動
+
+手動更新:
+
+```
+/再起動
+```
+
+詳細: [BOT-HOSTING.md § 5](../BOT-HOSTING.md#5-github-自動更新)
+
+---
+
+## ヘルスチェック・ロギング
+
+### ヘルスチェック API
+
+```bash
+curl http://localhost:8080/health
+```
+
+出力例:
+
+```json
+{
+  "status": "healthy",
+  "uptime": 3600,
+  "lastScrapeAt": "2026-08-31T12:34:56Z",
+  "scrapesPerformed": 45,
+  "boys_online": 3,
+  "sessionCount": 2
+}
+```
+
+Bot-Hosting の Health Check を設定:
+
+```
+Endpoint: /health
+Interval: 30s
+Timeout: 5s
+```
+
+### ログレベル設定
+
+運用フェーズに応じて `LOG_LEVEL` 環境変数で調整:
+
+```
+LOG_LEVEL=ERROR      → エラーのみ（本番推奨）
+LOG_LEVEL=WARN       → 警告+エラー
+LOG_LEVEL=INFO       → 情報+警告+エラー（デバッグ時推奨）
+LOG_LEVEL=DEBUG      → 全ログ（開発時のみ）
+```
+
+詳細: [BOT-HOSTING.md § 7](../BOT-HOSTING.md#7-ヘルスチェック機能)
+
+---
+
+## セッション・認証管理
+
+### セッション永続化
+
+管理者認証後のセッションは `data/sessions.json` に自動保存:
+
+```
+✓ プロセス再起動後も有効
+✓ 24時間ごとに期限切れセッションを自動削除
+✓ メモリのみへの依存を解消
+```
+
+セッション有効期限: デフォルト 8時間（`AUTH_SESSION_HOURS` で変更可能）
+
+詳細: [BOT-HOSTING.md § 8](../BOT-HOSTING.md#8-セッション認証システム)
+
+---
+
+## ネットワークエラー対応
+
+x77.jp / dgdgdg.com / EX API へのアクセスが失敗した場合、自動的に再試行します：
+
+```
+再試行戦略: 指数バックオフ
+最大試行: 3回 + 初回 = 4回
+リトライト対象: HTTP 429/503/504, ネットワークエラー, タイムアウト
+```
+
+詳細: [BOT-HOSTING.md § 9](../BOT-HOSTING.md#9-ネットワークエラー自動リトライト)
 
 ---
 
@@ -49,55 +137,56 @@ DATA_DIR=data
 
 | 対策 | 説明 |
 |------|------|
-| `instance-lock.js` | 同一 `DATA_DIR` で PID ロック。2 プロセス目は exit(1) |
-| 運用ルール | **Cloud Agent / ローカルと Bot-Hosting を同時に動かさない** |
-| 同一トークン | Discord 上で両方 online になると通知が2倍 |
+| **instance-lock.js** | 同一 `DATA_DIR` で PID ロック。2 プロセス目は exit(1) |
+| **運用ルール** | **Bot-Hosting と ローカル / Cloud Agent を同時に動かさない** |
 
 ---
 
-## ヘルスチェック
+## データ永続化・バックアップ
+
+| パス | 内容 | 自動バックアップ |
+|------|------|------------------|
+| `data/config.json` | 全状態（boy 情報、設定値） | 3時間ごと |
+| `data/sessions.json` | セッション情報 | （毎回保存） |
+| `data/reports/` | 日次/週次レポート（JSON/CSV） | 営業中 3時間ごと |
+| `data/backups/` | config スナップショット | 自動 + 手動 list |
+
+### レポート取得
+
+**Discord コマンド**（管理者パスワード必須）:
 
 ```
-GET http://0.0.0.0:{PORT}/
-→ 200 "ok"
+/レポート一覧
+/レポート取得 営業日:2026-08-28 形式:CSV
 ```
 
-デフォルト PORT=8080。Bot-Hosting のヘルスチェックに利用可。
-
----
-
-## データ永続化
-
-| パス | 内容 | バックアップ |
-|------|------|-------------|
-| `data/config.json` | 全状態 | 3h 自動 + `/設定復元` |
-| `data/reports/` | 日次/週次 | SFTP / `/レポート取得` |
-| `data/backups/` | config スナップショット | 手動 list |
-
-**注意**: 無料プランは **4 日ごと** に Renew が必要。
-
----
-
-## SFTP
-
-レポート回収:
+**SFTP で一括取得**:
 
 ```bash
 bash scripts/sftp-pull-reports.sh
 ```
 
-設定例: `bot-hosting.sftp.example`
-
-リモートパス: `/home/container/data/reports/`
+詳細: [BOT-HOSTING.md § 6](../BOT-HOSTING.md#6-sftpレポートファイル取得)
 
 ---
 
-## 障害対応
+## トラブルシューティング
 
-### 通知が来ない
+### よくある問題
 
-1. `notifyEnabled` / `notifyChannelId` 確認（`/設定確認`）
-2. 営業時間内か（01:00〜13:00 は定期通知停止）
+| 症状 | 原因 | 対処 |
+|------|------|------|
+| Bot が起動しない | トークン設定ミス / npm インストール失敗 | [BOT-HOSTING.md § 10](../BOT-HOSTING.md#10-トラブルシューティング) 参照 |
+| Discord に通知が来ない | チャンネル ID や 権限の設定ミス | [BOT-HOSTING.md § 10](../BOT-HOSTING.md#10-トラブルシューティング) 参照 |
+| x77.jp スクレイプ失敗 | VPN / プロキシの影響、API 変更 | [BOT-HOSTING.md § 10](../BOT-HOSTING.md#10-トラブルシューティング) 参照 |
+| メモリ不足エラー | レポートファイル蓄積 | [BOT-HOSTING.md § 10](../BOT-HOSTING.md#10-トラブルシューティング) 参照 |
+
+### Console ログの確認
+
+Bot-Hosting ダッシュボード → **Console** タブ  
+最新のログから古い順に表示。エラーが発生した時刻付近を確認。
+
+### 再起動が必要な変更
 3. quiet hours 設定
 4. オンライン 0 かつシフト不一致なし → 意図的スキップ
 5. Bot online か（Discord）

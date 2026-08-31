@@ -92,7 +92,76 @@ EX リポジトリ（[Elion-dev99/EX](https://github.com/Elion-dev99/EX)）の `
   あつき / いくま / ...
 ```
 
-## Monkey Network デプロイ（無料・Bot 最大4体）
+## Bot-Hosting.net デプロイ（**推奨**・無料・本番最適）
+
+🎯 **本番環境での推奨デプロイ方法**
+
+### セットアップ（5分）
+
+1. [Bot-Hosting.net](https://bot-hosting.net/) でアカウント作成
+2. **New Deployment** → **Application** → GitHub `Elion-dev99/X77live` を Import
+3. **Startup**:
+   - Runtime: `Node.js 18+`
+   - Entry File: `index.js`
+4. **Env Variables**: [bot-hosting.env.example](./bot-hosting.env.example) をコピー
+   - 必須: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`, `ADMIN_PASSWORD`, `ADMIN_USER_ID`
+5. **Start** → Console ログ確認（ログイン成功で準備完了）
+
+### 本番運用機能
+
+| 機能 | 説明 |
+|------|------|
+| **ヘルスチェック** | `GET /health` → Uptime, 取得件数, Bot 状態等を自動監視 |
+| **セッション永続化** | `data/sessions.json` に保存 → プロセス再起動後も有効 |
+| **自動リトライト** | x77.jp / dgdgdg 取得失敗時は指数バックオフで再試行 |
+| **ロギング統一** | `LOG_LEVEL` で制御（デバッグ/本番切り替え） |
+| **GitHub 自動同期** | `main` push 後、自動再起動（Auto Pull） |
+| **二重起動防止** | PID ロックで同時起動を防止 |
+
+### 環境変数クイックリファレンス
+
+```bash
+# 必須
+DISCORD_TOKEN=...              # Bot トークン (Secret)
+DISCORD_CLIENT_ID=...          # Application ID
+DISCORD_GUILD_ID=...           # サーバー ID
+NOTIFY_CHANNEL_ID=...          # 通知先チャンネル (#x77live)
+ADMIN_PASSWORD=...             # 管理パスワード (Secret)
+ADMIN_USER_ID=...              # 管理者 Discord ID
+DATA_DIR=data
+
+# 推奨（デフォルト値あり）
+LOG_LEVEL=WARN                 # ログレベル (ERROR, WARN, INFO, DEBUG)
+POLL_INTERVAL_MINUTES=2        # スクレイプ間隔
+NOTIFY_INTERVAL_MINUTES=10     # 通知間隔
+AUTH_SESSION_HOURS=8           # セッション有効時間
+```
+
+詳細: [BOT-HOSTING.md](./BOT-HOSTING.md) / [docs/08-operations.md](./docs/08-operations.md)
+
+### 起動成功ログ例
+
+```
+[boot] using DATA_DIR= /home/container/data
+ログイン完了: X77live#1234
+[INFO] [session-manager] セッション自動クリーンアップを開始
+[monitor] 監視開始: 2分間隔
+[notifier] 定期通知を開始: 10分間隔
+スラッシュコマンドをギルド ... に登録しました (18件)
+```
+
+### トラブル対応
+
+| 症状 | 対処 |
+|------|------|
+| Bot が起動しない | Console ログを確認 → [BOT-HOSTING.md § 10](./BOT-HOSTING.md#10-トラブルシューティング) 参照 |
+| 通知が来ない | チャンネル ID / パスワード確認 → `/状況` で動作確認 |
+| x77.jp 取得失敗 | 自動リトライト機構が動作中。30秒〜3分で復旧 |
+| メモリ不足 | レポート削除 / プランアップグレード |
+
+---
+
+## Monkey Network デプロイ（無料・複数Bot向け）
 
 1. [Monkey Network](https://monkey-network.xyz/) → [ダッシュボード](https://dash.monkey-network.xyz) で Node.js サーバー作成
 2. SFTP で `/home/container/` にアップロード（`scripts/pack-deploy.sh` で zip 作成可）
@@ -106,18 +175,7 @@ EX リポジトリ（[Elion-dev99/EX](https://github.com/Elion-dev99/EX)）の `
 | RAM | **2GB** / Bot |
 | 更新 | **14日ごと** にダッシュボードで確認 |
 
-## Bot-Hosting.net デプロイ（無料）
-
-1. [Bot-Hosting.net](https://bot-hosting.net/) で GitHub リポジトリ `Elion-dev99/X77live` を Import
-2. **Startup** → Entry File: `index.js`
-3. **Env Variables** に設定（詳細は [BOT-HOSTING.md](./BOT-HOSTING.md) / [bot-hosting.env.example](./bot-hosting.env.example)）
-
-| 変数 | 必須 | 説明 |
-|------|------|------|
-| `DISCORD_TOKEN` | ✅ | Bot トークン |
-| `DISCORD_CLIENT_ID` | ✅ | Application ID |
-| `DISCORD_GUILD_ID` | 推奨 | サーバー ID |
-| `NOTIFY_CHANNEL_ID` | 推奨 | 通知先チャンネル |
+---
 | `SHOP_ID` | 任意 | 大阪店 = `4` |
 | `ADMIN_PASSWORD` | ✅ | カスタマイズ用パスワード |
 | `DATA_DIR` | 推奨 | `data` |
