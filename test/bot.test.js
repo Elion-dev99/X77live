@@ -86,6 +86,57 @@ describe("scraper", () => {
     assert.equal(merged.find((b) => b.boyId === "100").status, STATUS.WAITING);
     assert.equal(merged.find((b) => b.boyId === "200").status, STATUS.OFFLINE);
   });
+
+  it("parseLivePage and parseRosterPage return empty maps for invalid HTML", () => {
+    assert.deepEqual(parseLivePage(""), new Map());
+    assert.deepEqual(parseRosterPage("<html>broken</html>"), new Map());
+  });
+
+  it("fetchLiveOnline retries after age-check and keeps working on invalid first page", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+
+    try {
+      globalThis.fetch = async (url) => {
+        calls.push(String(url));
+        if (calls.length === 1) {
+          return {
+            ok: true,
+            status: 200,
+            headers: { getSetCookie: () => [] },
+            text: async () => "<html><body>年齢認証</body></html>",
+          };
+        }
+
+        if (calls.length === 2) {
+          return {
+            ok: true,
+            status: 200,
+            headers: { getSetCookie: () => ["X_LIVE_SERVICE=abc; path=/", "view_mode=1; path=/"] },
+            text: async () => `
+              <html><body>
+                <li><a href="/boy_id=100"> <div class="liveinfo"><p>つむぎ</p></div> <span class="live_situation02">待機中</span></li>
+              </body></html>
+            `,
+          };
+        }
+
+        return {
+          ok: true,
+          status: 200,
+          headers: { getSetCookie: () => [] },
+          text: async () => "<html><body></body></html>",
+        };
+      };
+
+      const result = await import("../src/scraper.js");
+      const statuses = await result.fetchLiveOnline("4");
+      assert.ok(statuses.has("100"));
+      assert.equal(statuses.get("100").name, "つむぎ");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 
 describe("store", () => {
