@@ -25,6 +25,15 @@ let lastCookieRefresh = 0;
 const COOKIE_TTL_MS = 30 * 60 * 1000;
 const REQUIRED_COOKIES = ["X_LIVE_SERVICE", "view_mode", "live_lang"];
 
+function resetSessionCookies() {
+  sessionCookies.clear();
+  lastCookieRefresh = 0;
+}
+
+function hasMeaningfulHtmlData(html) {
+  return /boy_id=|live_situation0[12]|fvliver_list_top|search_tribe/.test(html || "");
+}
+
 export const STATUS = {
   WAITING: "待機中",
   IN_CALL: "通話中",
@@ -99,6 +108,12 @@ async function ensureSession(shopId = DEFAULT_SHOP_ID) {
     { headers, redirect: "manual" }
   );
 
+  if (!res.ok && res.status >= 400) {
+    logger.warn(`年齢確認ページ取得失敗: HTTP ${res.status}. Cookie をリセットして再試行します`);
+    resetSessionCookies();
+    return;
+  }
+
   const setCookie = res.headers.getSetCookie?.() || [];
   for (const c of setCookie) {
     const part = c.split(";")[0];
@@ -106,6 +121,13 @@ async function ensureSession(shopId = DEFAULT_SHOP_ID) {
     if (eq === -1) continue;
     sessionCookies.set(part.slice(0, eq), part.slice(eq + 1));
   }
+
+  if (sessionCookies.size === 0) {
+    logger.warn("年齢確認後に Cookie を取得できませんでした。セッションを再初期化します");
+    resetSessionCookies();
+    return;
+  }
+
   lastCookieRefresh = Date.now();
 }
 
@@ -144,6 +166,10 @@ export function parseLivePage(html) {
   /** @type {Map<string, { boyId: string, name: string, status: string }>} */
   const statuses = new Map();
 
+  if (typeof html !== "string" || html.trim() === "") {
+    return statuses;
+  }
+
   const blocks = html.match(/<li>[\s\S]*?<\/li>/g) || [];
   for (const block of blocks) {
     const idMatch = block.match(/boy_id=(\d+)/);
@@ -177,6 +203,10 @@ export function parseLivePage(html) {
 export function parseRosterPage(html) {
   /** @type {Map<string, { boyId: string, name: string }>} */
   const roster = new Map();
+
+  if (typeof html !== "string" || html.trim() === "") {
+    return roster;
+  }
 
   const blocks = html.match(/<li class="flame_size1">[\s\S]*?<\/li>/g) || [];
   for (const block of blocks) {
@@ -238,9 +268,15 @@ export async function fetchLiveOnline(shopId = DEFAULT_SHOP_ID) {
   let html = await fetchLiverListHtml(1, shopId);
 
   if (html.includes("年齢認証") && !html.includes("fvliver_list_top")) {
-    sessionCookies.clear();
-    await ensureSession();
+    logger.warn("年齢確認ページを検出したため、Cookie を再初期化して再取得します");
+    resetSessionCookies();
+    await ensureSession(shopId);
     html = await fetchLiverListHtml(1, shopId);
+  }
+
+  if (!hasMeaningfulHtmlData(html)) {
+    logger.warn(`Live page が妥当なデータを含んでいません: shopId=${shopId}`);
+    return new Map();
   }
 
   const statuses = parseLivePage(html);
@@ -249,6 +285,10 @@ export async function fetchLiveOnline(shopId = DEFAULT_SHOP_ID) {
 
   for (let pageNo = 2; pageNo <= totalPages; pageNo++) {
     const pageHtml = await fetchLiverListHtml(pageNo, shopId);
+    if (!hasMeaningfulHtmlData(pageHtml)) {
+      logger.warn(`Page ${pageNo} の HTML が破損していたためスキップしました`);
+      continue;
+    }
     for (const [boyId, boy] of parseLivePage(pageHtml)) {
       statuses.set(boyId, boy);
     }
@@ -266,6 +306,10 @@ export async function scrapeOsakaStatuses(shopId, excludeIds = new Set()) {
     fetchRoster(shopId),
     fetchLiveOnline(shopId),
   ]);
+
+  if (roster.size === 0 && online.size === 0) {
+    logger.warn(`スクレイピング結果が空でした: shopId=${shopId}. 前回の正常データ保持へフォールバックします`);
+  }
 
   let statuses = mergeOsakaStatuses(roster, online);
   if (excludeIds.size > 0) {

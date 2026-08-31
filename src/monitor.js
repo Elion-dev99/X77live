@@ -141,8 +141,15 @@ export async function runScrape(getConfig, persistConfig, client = null, options
 
   try {
     const data = await scrapeOsakaStatuses(shopId, excludeIds);
-    const newBoys = detectNewBoys(config, data.roster);
+    const prevBoys = config.boys || {};
     const prevStatuses = { ...(config.boyStatuses || {}) };
+
+    if (data.roster.size === 0 && data.online.size === 0 && Object.keys(prevBoys).length > 0) {
+      console.warn("[monitor] 取得データが空のため、前回の正常データを保持します");
+      return { skipped: true, reason: "empty_scrape_result", previous: config.lastScrapeAt || null };
+    }
+
+    const newBoys = detectNewBoys(config, data.roster);
     const statuses = applyScrapeResult(config, data);
     const changes = detectChanges({ boyStatuses: prevStatuses }, statuses);
 
