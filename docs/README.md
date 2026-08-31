@@ -18,6 +18,7 @@
 | 9 | [08-operations.md](./08-operations.md) | Bot-Hosting デプロイ・運用・障害対応 |
 | 10 | [09-development.md](./09-development.md) | ローカル開発・テスト・拡張ガイド |
 | — | [site-access-log.md](./site-access-log.md) | 外部サイトアクセス一覧（幹部向け） |
+| — | **[10-copilot-additions.md](./10-copilot-additions.md)** | **Copilot 追加分の整理（2026-08-31）** |
 
 ## 関連ファイル（リポジトリ内）
 
