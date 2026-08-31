@@ -57,6 +57,8 @@
 | `SHIFT_GRACE_MINUTES` | 任意 | シフト開始後の猶予（分）。デフォルト `15` |
 | `EX_SHIFT_ENABLED` | 任意 | EX API 連携。デフォルト `true`（`false` で dgdgdg のみ） |
 | `EX_SHIFT_JSON_URL` | 任意 | カスタムシフト JSON URL（省略時は EX 本番 API） |
+| `LOG_LEVEL` | 任意 | ログ出力レベル。`DEBUG`, `INFO`, `WARN`, `ERROR` から選択。デフォルト `INFO` |
+| `SESSION_TOKEN` | 任意 | セッション永続化用トークン（高度な設定、通常不要） |
 
 ### 管理者 DM（ADMIN_USER_ID）の取得
 
