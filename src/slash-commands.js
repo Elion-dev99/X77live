@@ -193,6 +193,17 @@ export function buildSlashCommands() {
       .addStringOption(passwordOption(false)),
 
     new SlashCommandBuilder()
+      .setName("稼働グラフ")
+      .setDescription("営業日の稼働ランキンググラフを管理者DMに送信")
+      .addStringOption((opt) =>
+        opt
+          .setName("営業日")
+          .setDescription("営業開始日 YYYY-MM-DD（省略時は最新 or 営業中）")
+          .setRequired(false)
+      )
+      .addStringOption(passwordOption(false)),
+
+    new SlashCommandBuilder()
       .setName("設定復元")
       .setDescription("config.json の最新バックアップから設定を復元")
       .addStringOption((opt) =>
@@ -307,6 +318,12 @@ export function parseSlashInteraction(interaction) {
     case "出勤チェック":
       return {
         command: "shift_check",
+        password: getPassword(interaction),
+      };
+    case "稼働グラフ":
+      return {
+        command: "report_chart",
+        sessionKey: interaction.options.getString("営業日"),
         password: getPassword(interaction),
       };
     case "ヘルプ":

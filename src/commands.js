@@ -11,9 +11,12 @@ import {
   resolveReportDownload,
   loadReportDocument,
   buildInterimReportFiles,
+  buildDailyReportDocument,
 } from "./daily-report-files.js";
 import { runShiftCheck } from "./shift-monitor.js";
-import { getCurrentBusinessDayStats } from "./daily-stats.js";
+import {
+  getCurrentBusinessDayStats,
+} from "./daily-stats.js";
 import { fetchTodayShift } from "./shift-scraper.js";
 import { compareShiftWithStatuses } from "./shift-compare.js";
 import {
@@ -46,6 +49,11 @@ import {
   getSessionExpiry,
   isPasswordConfigured,
 } from "./auth.js";
+import { sendAdminDirectMessage } from "./admin-notify.js";
+import {
+  renderDailyRankingChart,
+  buildDailyChartDmCaption,
+} from "./chart-report.js";
 
 let configCache = null;
 /** @type {import('discord.js').Client|null} */
@@ -555,6 +563,87 @@ export async function handleCommand(interaction, parsed) {
       };
     }
 
+    case "report_chart": {
+      await interaction.deferReply({ ephemeral: true });
+      try {
+        let report = null;
+        let sessionKey = normalizeSessionKey(parsed.sessionKey);
+
+        if (sessionKey) {
+          report = loadReportDocument(sessionKey);
+          if (!report) {
+            return {
+              type: "deferred",
+              interaction,
+              content: `⚠️ **${sessionKey}** の保存済みレポートが見つかりません。\`/レポート一覧\` で確認してください。`,
+              ephemeral: true,
+            };
+          }
+        } else {
+          const current = getCurrentBusinessDayStats(getConfig(), new Date());
+          if (current.ok) {
+            report = buildDailyReportDocument(getConfig(), current.stats);
+          } else {
+            sessionKey = getLatestSessionKey();
+            if (!sessionKey) {
+              return {
+                type: "deferred",
+                interaction,
+                content:
+                  "⚠️ 送信できるレポートがありません。営業時間中か、保存済みレポートを指定してください。",
+                ephemeral: true,
+              };
+            }
+            report = loadReportDocument(sessionKey);
+            if (!report) {
+              return {
+                type: "deferred",
+                interaction,
+                content: `⚠️ **${sessionKey}** のレポートを読み込めませんでした。`,
+                ephemeral: true,
+              };
+            }
+          }
+        }
+
+        const caption = buildDailyChartDmCaption(report);
+        const chart = await renderDailyRankingChart(report);
+        const sent = await sendAdminDirectMessage(
+          clientRef,
+          getConfig(),
+          caption,
+          chart
+            ? { files: [{ attachment: chart.buffer, name: chart.filename }] }
+            : {}
+        );
+
+        if (!sent) {
+          return {
+            type: "deferred",
+            interaction,
+            content:
+              "⚠️ 管理者DMの送信に失敗しました。`ADMIN_USER_ID` と Bot とのDM可否を確認してください。",
+            ephemeral: true,
+          };
+        }
+
+        return {
+          type: "deferred",
+          interaction,
+          content: `✅ 稼働グラフを管理者DMに送信しました（営業日 **${report.sessionKey}**）。`,
+          ephemeral: true,
+        };
+      } catch (err) {
+        console.error("[report] 稼働グラフ送信エラー:", err);
+        return {
+          type: "deferred",
+          interaction,
+          content: `⚠️ グラフ送信に失敗しました: ${err.message}`,
+          ephemeral: true,
+        };
+      }
+    }
+
     case "help":
       return {
         type: "text",
@@ -572,6 +661,7 @@ export async function handleCommand(interaction, parsed) {
           "• `/再起動` — Bot サーバー再起動",
           "• `/レポート一覧` `/レポート取得` — 確定レポート",
           "• `/レポート途中` — 営業日の現時点までの暫定レポート",
+          "• `/稼働グラフ` — 稼働ランキンググラフを管理者DMへ送信",
           "• `/出勤チェック` — シフトとオンライン状態の不一致を確認",
           "• `/設定復元` — config.json をバックアップから復元",
           "• `/ログアウト` — セッション終了",
@@ -584,6 +674,7 @@ export async function handleCommand(interaction, parsed) {
           `- **${config.notifyIntervalMinutes}分** ごとに Discord へ定期通知`,
           `- **新規ボーイ** がロスターに追加されると通知`,
           `- **毎日 01:00** に本日のオンライン稼働サマリーを投稿（待機/通話時間を分離集計）`,
+          `- **毎日 01:00** に稼働ランキング**グラフを管理者DM**へ送信`,
           `- **日曜営業終了後（月 01:00）** に週間サマリーを投稿（月〜日）`,
           `- サマリーは \`data/reports/営業日.json\` と \`.csv\` にも保存`,
           `- **${config.settings.configBackupIntervalHours || 3}時間** ごとに \`data/backups/config-latest.json\` を自動保存`,
