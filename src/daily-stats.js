@@ -8,8 +8,16 @@ import {
 } from "./business-hours.js";
 import { buildDailySummaryEmbed } from "./format.js";
 import { addHistory } from "./store.js";
-import { saveDailyReportFiles } from "./daily-report-files.js";
+import {
+  saveDailyReportFiles,
+  buildDailyReportDocument,
+} from "./daily-report-files.js";
 import { maybeSendWeeklySummary } from "./weekly-report.js";
+import { sendAdminDirectMessage } from "./admin-notify.js";
+import {
+  renderDailyRankingChart,
+  buildDailyChartDmCaption,
+} from "./chart-report.js";
 
 function ensureBoyStat(boys, boyId, name) {
   if (!boys[boyId]) {
@@ -169,27 +177,57 @@ export async function maybeSendDailySummary(client, getConfig, persistConfig) {
   await maybeSendWeeklySummary(client, getConfig, persistConfig);
 }
 
+export async function sendDailyChartToAdminDm(client, config, stats) {
+  const settings = config.settings || {};
+  if (settings.dailyChartDmEnabled === false) return false;
+  if (!client) return false;
+
+  const report = buildDailyReportDocument(config, stats);
+  const caption = buildDailyChartDmCaption(report);
+
+  try {
+    const chart = await renderDailyRankingChart(report);
+    if (!chart) {
+      await sendAdminDirectMessage(client, config, caption);
+      return true;
+    }
+
+    await sendAdminDirectMessage(client, config, caption, {
+      files: [{ attachment: chart.buffer, name: chart.filename }],
+    });
+    return true;
+  } catch (err) {
+    console.error("[daily-summary] グラフDM送信失敗:", err.message);
+    await sendAdminDirectMessage(
+      client,
+      config,
+      `${caption}\n\n⚠️ グラフ画像の生成に失敗しました: ${err.message}`
+    );
+    return false;
+  }
+}
+
 export async function sendDailySummaryNotification(client, config, stats) {
   const channelId = config.notifyChannelId;
   if (!channelId) {
     console.warn("[daily-summary] notifyChannelId 未設定のためスキップ");
-    return;
+  } else {
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel?.isTextBased()) {
+        const embed = buildDailySummaryEmbed(config, stats);
+        await channel.send({
+          embeds: [embed],
+          allowedMentions: { parse: [] },
+        });
+        console.log(
+          `[daily-summary] サマリー送信完了 (session=${stats.sessionKey})`
+        );
+      }
+    } catch (err) {
+      console.error("[daily-summary] 送信エラー:", err.message);
+    }
   }
 
-  try {
-    const channel = await client.channels.fetch(channelId);
-    if (!channel?.isTextBased()) return;
-
-    const embed = buildDailySummaryEmbed(config, stats);
-    await channel.send({
-      embeds: [embed],
-      allowedMentions: { parse: [] },
-    });
-
-    console.log(
-      `[daily-summary] サマリー送信完了 (session=${stats.sessionKey})`
-    );
-  } catch (err) {
-    console.error("[daily-summary] 送信エラー:", err.message);
-  }
+  await sendDailyChartToAdminDm(client, config, stats);
 }

@@ -26,8 +26,9 @@ export function getAdminUserIds(config) {
  * @param {import('discord.js').Client} client
  * @param {object} config
  * @param {string} content
+ * @param {{ files?: Array<{ attachment: Buffer|string, name: string }>, embeds?: import('discord.js').EmbedBuilder[] }} [options]
  */
-export async function sendAdminDirectMessage(client, config, content) {
+export async function sendAdminDirectMessage(client, config, content, options = {}) {
   const userIds = getAdminUserIds(config);
   if (userIds.length === 0) {
     console.warn("[admin-notify] ADMIN_USER_ID 未設定のため管理DMをスキップ");
@@ -39,7 +40,9 @@ export async function sendAdminDirectMessage(client, config, content) {
     try {
       const user = await client.users.fetch(userId);
       await user.send({
-        content,
+        content: content || undefined,
+        embeds: options.embeds,
+        files: options.files,
         allowedMentions: { parse: [] },
       });
       sent = true;

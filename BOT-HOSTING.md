@@ -42,6 +42,8 @@
 | `BUSINESS_HOURS_OPEN` | 任意 | 営業開始。デフォルト `13:00` |
 | `BUSINESS_HOURS_CLOSE` | 任意 | 営業終了。デフォルト `01:00` |
 | `DAILY_SUMMARY_AT` | 任意 | 日次サマリー送信時刻。デフォルト `01:00` |
+| `DAILY_CHART_DM_ENABLED` | 任意 | 01:00 稼働グラフを管理者DMへ送信。デフォルト `true` |
+| `QUICKCHART_URL` | 任意 | グラフ生成 API。デフォルト `https://quickchart.io/chart` |
 | `SCRAPE_ALERT_THRESHOLD` | 任意 | 連続取得失敗の閾値。デフォルト `3` |
 | `SCRAPE_ALERT_ENABLED` | 任意 | 取得失敗アラート。デフォルト `true` |
 | `REPORT_BACKUP_INTERVAL_HOURS` | 任意 | 営業中バックアップ間隔（時間）。デフォルト `3` |
