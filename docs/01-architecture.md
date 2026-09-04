@@ -33,6 +33,9 @@ X77live/
 │   ├── scrape-health.js     # 連続失敗アラート
 │   ├── bot-liveness.js      # 監視停止検知
 │   ├── instance-lock.js     # 二重起動防止
+│   ├── logger.js            # 統一ログ（LOG_LEVEL）
+│   ├── network.js           # fetch リトライ・バックオフ
+│   ├── session-manager.js   # sessions.json（レガシー認証と併存）
 │   ├── commands.js          # コマンド処理
 │   ├── slash-commands.js    # Discord コマンド定義
 │   ├── auth.js              # パスワード・セッション
@@ -44,6 +47,7 @@ X77live/
 └── data/                    # 実行時データ（gitignore）
     ├── config.json
     ├── bot.instance.lock
+    ├── sessions.json          # Copilot 追加（新セッション方式・通常は未使用）
     ├── backups/
     └── reports/
 ```

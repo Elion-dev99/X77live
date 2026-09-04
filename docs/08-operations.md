@@ -62,28 +62,18 @@ DATA_DIR=data
 ### ヘルスチェック API
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8080/
+# → ok
 ```
 
-出力例:
+現行 `src/health.js` は **ルート `/` にプレーンテキスト `ok` のみ** 返します。  
+JSON の `/health` エンドポイントは **未実装**（BOT-HOSTING.md の JSON 例は将来案）。
 
-```json
-{
-  "status": "healthy",
-  "uptime": 3600,
-  "lastScrapeAt": "2026-08-31T12:34:56Z",
-  "scrapesPerformed": 45,
-  "boys_online": 3,
-  "sessionCount": 2
-}
-```
-
-Bot-Hosting の Health Check を設定:
+Bot-Hosting Health Check 設定例:
 
 ```
-Endpoint: /health
+Endpoint: /
 Interval: 30s
-Timeout: 5s
 ```
 
 ### ログレベル設定
@@ -105,17 +95,12 @@ LOG_LEVEL=DEBUG      → 全ログ（開発時のみ）
 
 ### セッション永続化
 
-管理者認証後のセッションは `data/sessions.json` に自動保存:
+**現行本番（デフォルト）**: `config.json` 内 `auth.sessions[userId]` に ISO 期限を保存。再起動後も `loadConfig()` で復元。
 
-```
-✓ プロセス再起動後も有効
-✓ 24時間ごとに期限切れセッションを自動削除
-✓ メモリのみへの依存を解消
-```
+**Copilot 追加（オプション）**: `data/sessions.json` + トークンキー。  
+`config.auth.sessions` オブジェクトが存在する限り **レガシー方式が優先** され、sessions.json は使われない。
 
-セッション有効期限: デフォルト 8時間（`AUTH_SESSION_HOURS` で変更可能）
-
-詳細: [BOT-HOSTING.md § 8](../BOT-HOSTING.md#8-セッション認証システム)
+詳細: [10-copilot-additions.md § セッション](./10-copilot-additions.md#1-セッション管理は二重構造)
 
 ---
 
@@ -183,35 +168,12 @@ bash scripts/sftp-pull-reports.sh
 
 ### Console ログの確認
 
-Bot-Hosting ダッシュボード → **Console** タブ  
-最新のログから古い順に表示。エラーが発生した時刻付近を確認。
+Bot-Hosting ダッシュボード → **Console** タブ。  
+Copilot 追加後は `[timestamp] [LEVEL] [module]` 形式と `[monitor]` 等の旧形式が混在する場合あり。
 
-### 再起動が必要な変更
-3. quiet hours 設定
-4. オンライン 0 かつシフト不一致なし → 意図的スキップ
-5. Bot online か（Discord）
+### 通知が来ない / 重複 / スクレイプ失敗
 
-### 同じ通知が複数
-
-1. Bot プロセス数（Console）
-2. ローカル開発 Bot が起動していないか
-3. PR #24 以降: デデュープ + instance-lock 確認
-
-### スクレイプ失敗
-
-1. Console: `[monitor] スクレイプ失敗`
-2. 連続 3 回で管理者 DM
-3. x77 障害 / Cookie / HTML 変更を疑う
-
-### Bot 死活アラート
-
-- `lastScrapeAt` が N 分更新なし（営業時間内）
-- 監視ループ停止 / プロセス死 / 営業時間外で lastScrape 更新なし
-
-### `/レポート途中` エラー
-
-- 営業時間外 → 正常メッセージ
-- `getCurrentBusinessDayStats` import 要確認（`commands.js`）
+→ 各項目は [04-notifications.md](./04-notifications.md)、[03-monitoring-and-scraping.md](./03-monitoring-and-scraping.md) 参照。
 
 ---
 

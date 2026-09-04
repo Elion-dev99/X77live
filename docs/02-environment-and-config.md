@@ -32,7 +32,9 @@
 | `NOTIFY_INTERVAL_MINUTES` | `10` | `notifyIntervalMinutes` |
 | `NOTIFY_ENABLED` | `true` | `notifyEnabled` |
 | `DATA_DIR` | `data` | —（ファイルパスのみ） |
-| `PORT` | `8080` | —（health server） |
+| `PORT` | `8080` | —（health server、`/` → `ok`） |
+| `LOG_LEVEL` | `INFO` | `logger.js`: DEBUG / INFO / WARN / ERROR |
+| `SESSION_TOKEN` | なし | 環境変数セッション（高度・通常不要） |
 
 ### 認証
 
