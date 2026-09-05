@@ -44,6 +44,9 @@
 | `DAILY_SUMMARY_AT` | 任意 | 日次サマリー送信時刻。デフォルト `01:00` |
 | `DAILY_CHART_DM_ENABLED` | 任意 | 01:00 稼働グラフを管理者DMへ送信。デフォルト `true` |
 | `QUICKCHART_URL` | 任意 | グラフ生成 API。デフォルト `https://quickchart.io/chart` |
+| `LINE_DAILY_SUMMARY_ENABLED` | 任意 | 日次サマリーのみ幹部LINEグループへ送信。デフォルト `true`（トークン未設定時は実質スキップ） |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINE連携時 | Messaging API のチャネルアクセストークン |
+| `LINE_GROUP_ID` | LINE連携時 | 送信先グループID（`C` で始まる） |
 | `SCRAPE_ALERT_THRESHOLD` | 任意 | 連続取得失敗の閾値。デフォルト `3` |
 | `SCRAPE_ALERT_ENABLED` | 任意 | 取得失敗アラート。デフォルト `true` |
 | `REPORT_BACKUP_INTERVAL_HOURS` | 任意 | 営業中バックアップ間隔（時間）。デフォルト `3` |
@@ -84,6 +87,25 @@
 
 3. Discord `#x77live` に通知が届くか確認
 4. `/更新` → `/状況` で動作確認
+
+## 4.1 LINE 日次サマリー（任意）
+
+**毎日 01:00 の確定サマリーだけ** 幹部 LINE グループへ送ります（途中通知・定期通知は送りません）。
+
+1. [LINE Developers](https://developers.line.biz/) で Messaging API チャネル作成
+2. **チャネルアクセストークン（長期）** を発行 → `LINE_CHANNEL_ACCESS_TOKEN`
+3. Bot を幹部グループに招待
+4. グループ ID（`C` で始まる）を取得 → `LINE_GROUP_ID`
+   - 取得方法例: 一時的に Webhook で `join` / `message` イベントの `source.groupId` をログする、または既存ツールで確認
+5. 環境変数:
+
+```
+LINE_DAILY_SUMMARY_ENABLED=true
+LINE_CHANNEL_ACCESS_TOKEN=...
+LINE_GROUP_ID=Cxxxxxxxx...
+```
+
+未設定なら Discord のみで動作します。
 
 ## 5. GitHub 自動更新
 
