@@ -18,6 +18,7 @@ import {
   renderDailyRankingChart,
   buildDailyChartDmCaption,
 } from "./chart-report.js";
+import { sendDailySummaryToLineGroup } from "./line-messaging.js";
 
 function ensureBoyStat(boys, boyId, name) {
   if (!boys[boyId]) {
@@ -230,4 +231,10 @@ export async function sendDailySummaryNotification(client, config, stats) {
   }
 
   await sendDailyChartToAdminDm(client, config, stats);
+
+  try {
+    await sendDailySummaryToLineGroup(config, stats);
+  } catch (err) {
+    console.error("[daily-summary] LINE送信失敗:", err.message);
+  }
 }
