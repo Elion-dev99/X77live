@@ -8,7 +8,7 @@ import { getLogger } from "./logger.js";
 const logger = getLogger("network");
 
 /**
- * リトライト設定
+ * リトライ設定
  */
 const DEFAULT_RETRY_CONFIG = {
   maxRetries: 3,
@@ -77,7 +77,14 @@ export async function fetchWithRetry(url, options = {}, retryConfig = {}) {
 
       clearTimeout(timeoutHandle);
 
-      if (!response.ok) {
+      // redirect: "manual" の場合、302などのリダイレクトは
+      // 年齢確認用Cookieを取得するための正常なレスポンスとして扱う。
+      const isManualRedirect =
+        options.redirect === "manual" &&
+        response.status >= 300 &&
+        response.status < 400;
+
+      if (!response.ok && !isManualRedirect) {
         const error = new Error(`HTTP ${response.status}`);
         error.status = response.status;
 
