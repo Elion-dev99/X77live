@@ -54,3 +54,30 @@ export async function sendAdminDirectMessage(client, config, content, options = 
 
   return sent;
 }
+
+/**
+ * アプリケーションエラーを管理者DMへ送信する。
+ * エラー通知自身の失敗は呼び出し元へ投げず、ログだけに留める。
+ * @param {import('discord.js').Client} client
+ * @param {object} config
+ * @param {unknown} err
+ * @param {string} [context]
+ */
+export async function sendAdminErrorMessage(client, config, err, context = "不明") {
+  if (!client || !config) return false;
+
+  const error = err instanceof Error ? err : new Error(String(err));
+  const stack = error.stack || error.message;
+  const truncatedStack = stack.length > 3500 ? `${stack.slice(0, 3500)}\n…` : stack;
+  const content = [
+    "🚨 **X77liveでエラーが発生しました**",
+    "",
+    `発生箇所: **${context}**`,
+    `時刻: ${new Date().toISOString()}`,
+    "```text",
+    truncatedStack,
+    "```",
+  ].join("\n");
+
+  return sendAdminDirectMessage(client, config, content);
+}
