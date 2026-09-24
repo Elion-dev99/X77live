@@ -15,6 +15,7 @@ export const ADMIN_COMMANDS = new Set([
   "setting",
   "settings_show",
   "notify_test",
+  "error_test",
   "exclude_boy",
   "include_boy",
   "change_password",
@@ -78,11 +79,9 @@ export function initPasswordFromEnv(config) {
     config.auth.passwordSalt = record.passwordSalt;
     config.auth.passwordHash = record.passwordHash;
     if (forceReset) {
-      // テスト互換性: config.auth.sessions が存在する場合は従来の方式でクリア
       if (config.auth?.sessions && typeof config.auth.sessions === "object") {
         config.auth.sessions = {};
       } else {
-        // 新しいセッション管理
         revokeAllSessions("*all*");
       }
       logger.info("管理パスワードをリセットしました");
@@ -91,7 +90,6 @@ export function initPasswordFromEnv(config) {
 }
 
 export function cleanupExpiredSessions(config) {
-  // session-manager.jsで自動的に処理されるため、ここでは互換性関数として存在のみ
   logger.debug("cleanupExpiredSessions（session-manager.jsで自動処理）");
 }
 
@@ -103,15 +101,13 @@ export function cleanupExpiredSessions(config) {
  */
 export function isAuthenticated(sessionToken, config) {
   if (!sessionToken) return false;
-  
-  // テスト互換性: config.auth.sessions が存在する場合は従来の方式を使用
+
   if (config.auth?.sessions && typeof config.auth.sessions === "object") {
     const expiresAt = config.auth.sessions[sessionToken];
     if (!expiresAt) return false;
     return new Date(expiresAt).getTime() > Date.now();
   }
-  
-  // 新しいセッション管理の場合
+
   const validation = validateSession(sessionToken);
   return validation.valid;
 }
@@ -120,10 +116,9 @@ export function isAuthenticated(sessionToken, config) {
  * ユーザーを認証し、セッションを作成
  * @param {string} userId
  * @param {object} config
- * @returns {string|void} テスト互換性のためトークンを返す場合と返さない場合がある
+ * @returns {string|void}
  */
 export function authenticateUser(userId, config) {
-  // テスト互換性: config.auth.sessions が存在する場合は従来の方式を使用
   if (config.auth?.sessions && typeof config.auth.sessions === "object") {
     const hours = config.auth?.sessionHours || 8;
     config.auth.sessions[userId] = new Date(
@@ -131,8 +126,7 @@ export function authenticateUser(userId, config) {
     ).toISOString();
     return;
   }
-  
-  // 新しいセッション管理
+
   const hours = config.auth?.sessionHours || 8;
   const token = createSession(userId, hours);
   logger.info(`ユーザー認証: ${userId}`);
@@ -145,13 +139,11 @@ export function authenticateUser(userId, config) {
  * @param {object} config
  */
 export function logoutUser(userIdOrToken, config) {
-  // テスト互換性: config.auth.sessions が存在する場合は従来の方式を使用
   if (config.auth?.sessions && typeof config.auth.sessions === "object") {
     delete config.auth.sessions[userIdOrToken];
     return;
   }
-  
-  // 新しいセッション管理
+
   if (userIdOrToken) {
     revokeSession(userIdOrToken);
     logger.info("ユーザーログアウト");
@@ -180,18 +172,15 @@ export function requireAdminAuth(interaction, config, password) {
 
   const userId = interaction.user.id;
 
-  // パスワードで認証
   if (password && verifyPassword(password, config)) {
     authenticateUser(userId, config);
     return { ok: true };
   }
 
-  // セッションで認証（テスト互換性）
   if (isAuthenticated(userId, config)) {
     return { ok: true };
   }
 
-  // 環境変数のセッショントークンで認証
   const envSessionToken = process.env.SESSION_TOKEN?.trim();
   if (envSessionToken) {
     const validation = validateSession(envSessionToken);
