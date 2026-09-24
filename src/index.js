@@ -21,6 +21,7 @@ import { startBotLivenessScheduler } from "./bot-liveness.js";
 import { acquireInstanceLock } from "./instance-lock.js";
 import { startSessionCleanupScheduler } from "./session-manager.js";
 import { info, warn, error } from "./logger.js";
+import { sendAdminErrorMessage } from "./admin-notify.js";
 
 const token = process.env.DISCORD_TOKEN?.trim();
 if (!token || token === "your_bot_token_here") {
@@ -48,6 +49,14 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
+async function notifyAdminOfError(context, err) {
+  try {
+    await sendAdminErrorMessage(client, getConfig(), err, context);
+  } catch (notifyErr) {
+    console.error("[admin-notify] エラー通知送信失敗:", notifyErr);
+  }
+}
+
 async function registerSlashCommands() {
   if (!clientId) {
     warn("DISCORD_CLIENT_ID が未設定のため、スラッシュコマンドを自動登録しません。");
@@ -69,6 +78,7 @@ async function registerSlashCommands() {
     }
   } catch (err) {
     error("スラッシュコマンド登録エラー", err);
+    await notifyAdminOfError("slash command registration", err);
   }
 }
 
@@ -100,20 +110,33 @@ client.once(Events.ClientReady, async (c) => {
     }
   } catch (err) {
     error("起動後処理エラー（Bot本体は稼働中）", err);
+    await notifyAdminOfError("startup processing", err);
   }
 
   await registerSlashCommands();
 });
 
-process.on("unhandledRejection", (err) => {
+process.on("unhandledRejection", async (err) => {
   console.error("[fatal] unhandledRejection:", err);
+  await notifyAdminOfError("unhandledRejection", err);
 });
-process.on("uncaughtException", (err) => {
+process.on("uncaughtException", async (err) => {
   console.error("[fatal] uncaughtException:", err);
+  await notifyAdminOfError("uncaughtException", err);
 });
 
-client.on("error", (err) => console.error("[discord] error:", err));
-client.on("warn", (msg) => console.warn("[discord] warn:", msg));
+client.on("error", async (err) => {
+  console.error("[discord] error:", err);
+  await notifyAdminOfError("discord client error", err);
+});
+client.on("warn", async (msg) => {
+  console.warn("[discord] warn:", msg);
+  try {
+    await sendAdminErrorMessage(client, getConfig(), new Error(String(msg)), "discord warning");
+  } catch {
+    // ignore
+  }
+});
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
@@ -198,6 +221,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.reply(replyOptions);
   } catch (err) {
     console.error("インタラクション処理エラー:", err);
+    await notifyAdminOfError("interaction processing", err);
     const payload = {
       content:
         "⚠️ 処理中にエラーが発生しました。しばらくしてから再度お試しください。",
@@ -215,7 +239,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(token).catch((err) => {
+client.login(token).catch(async (err) => {
   console.error("[fatal] Discord ログイン失敗:", err.message);
+  await notifyAdminOfError("discord login", err);
   process.exit(1);
 });
